@@ -1,0 +1,6 @@
+.git
+.repo-sentry
+reports
+docs
+tests
+*.log
