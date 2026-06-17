@@ -52,6 +52,7 @@ Options:
   --output PATH                       Report output path. Prints to stdout when omitted
   --artifacts-dir PATH                Raw scanner output directory. Default: derived from output
   --fail-on SEVERITY                  Policy threshold. Default: high
+  --sbom                              Generate a CycloneDX SBOM alongside the report
   --clearwing-depth quick|standard    Clearwing depth when clearwing is selected
   --clearwing-budget NUMBER           Clearwing LLM budget hint
   --clearwing-timeout DURATION        Clearwing timeout hint

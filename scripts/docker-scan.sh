@@ -9,7 +9,7 @@ Runs repo-sentry in Docker against TARGET_DIR (default: TARGET_PATH or $PWD).
 Other --* arguments are passed through to the repo-sentry CLI.
 Behavior is configured via environment variables; see README.md
 (REPO_SENTRY_IMAGE, TARGET_PATH, REPORTS_DIR, CACHE_DIR, TOOLS, FORMAT,
-REPORT_DATE, REPORT_NAME, REPO, DOCKER_USER).
+REPORT_DATE, REPORT_NAME, REPO, SBOM, DOCKER_USER).
 EOF
 }
 
@@ -50,6 +50,11 @@ if [[ -n "${REPO:-}" ]]; then
   repo_args=(--repo "$REPO")
 fi
 
+sbom_args=()
+if [[ -n "${SBOM:-}" ]]; then
+  sbom_args=(--sbom)
+fi
+
 mkdir -p "$REPORTS_DIR" "$CACHE_DIR"
 
 TARGET_PATH="$(cd "$TARGET_PATH" && pwd -P)"
@@ -69,6 +74,7 @@ docker run --rm \
   run \
   --path /workspace/target \
   ${repo_args[@]+"${repo_args[@]}"} \
+  ${sbom_args[@]+"${sbom_args[@]}"} \
   --tools "$TOOLS" \
   --format "$FORMAT" \
   --output "/workspace/reports/${REPORT_DATE}_${REPORT_NAME}.${extension}" \

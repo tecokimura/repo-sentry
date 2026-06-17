@@ -103,18 +103,19 @@ repo-sentry は、alerts 件数だけでなく、取得元の状態もレポー�
 
 `scripts/docker-scan.sh` は、次の環境変数で動作を変えられます。
 
-| 変数                | 既定値                    | 説明                                                           |
-| ------------------- | ------------------------- | -------------------------------------------------------------- |
-| `REPO_SENTRY_IMAGE` | `repo-sentry:local`       | 実行する Docker image                                          |
-| `TARGET_PATH`       | 現在のディレクトリ        | スキャン対象ディレクトリ。第一引数でも指定でき、引数が優先     |
-| `REPORTS_DIR`       | `./reports`               | レポート出力先                                                 |
-| `CACHE_DIR`         | `./.repo-sentry`          | Deno / Trivy cache 保存先                                      |
-| `TOOLS`             | `gitleaks,trivy`          | 実行する collector。例: `gitleaks,trivy,dependabot`            |
-| `FORMAT`            | `markdown`                | 出力形式。`markdown` または `json`                             |
-| `REPORT_DATE`       | 実行日                    | レポートファイル名の日付                                       |
-| `REPORT_NAME`       | `repo-sentry-docker-scan` | レポートファイル名のタイトル部分                               |
-| `REPO`              | 未設定                    | GitHub repository。Dependabot 使用時に `owner/name` 形式で指定 |
-| `DOCKER_USER`       | `$(id -u):$(id -g)`       | bind mount へ書き込むための Docker 実行ユーザー                |
+| 変数                | 既定値                    | 説明                                                                     |
+| ------------------- | ------------------------- | ------------------------------------------------------------------------ |
+| `REPO_SENTRY_IMAGE` | `repo-sentry:local`       | 実行する Docker image                                                    |
+| `TARGET_PATH`       | 現在のディレクトリ        | スキャン対象ディレクトリ。第一引数でも指定でき、引数が優先               |
+| `REPORTS_DIR`       | `./reports`               | レポート出力先                                                           |
+| `CACHE_DIR`         | `./.repo-sentry`          | Deno / Trivy cache 保存先                                                |
+| `TOOLS`             | `gitleaks,trivy`          | 実行する collector。例: `gitleaks,trivy,dependabot`                      |
+| `FORMAT`            | `markdown`                | 出力形式。`markdown` または `json`                                       |
+| `REPORT_DATE`       | 実行日                    | レポートファイル名の日付                                                 |
+| `REPORT_NAME`       | `repo-sentry-docker-scan` | レポートファイル名のタイトル部分                                         |
+| `REPO`              | 未設定                    | GitHub repository。Dependabot 使用時に `owner/name` 形式で指定           |
+| `SBOM`              | 未設定                    | 空でない値を指定すると CycloneDX SBOM をレポートと同じディレクトリに生成 |
+| `DOCKER_USER`       | `$(id -u):$(id -g)`       | bind mount へ書き込むための Docker 実行ユーザー                          |
 
 例:
 

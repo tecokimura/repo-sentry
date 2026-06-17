@@ -10,6 +10,7 @@ export interface CliRunOptions {
   output?: string;
   artifactsDir?: string;
   failOnSeverity: Severity;
+  sbom: boolean;
   clearwingDepth?: "quick" | "standard" | "deep";
   clearwingBudget?: number;
   clearwingTimeout?: string;
@@ -44,6 +45,7 @@ export function parseRunOptions(args: string[]): CliRunOptions {
     output: flags.output,
     artifactsDir: flags["artifacts-dir"],
     failOnSeverity,
+    sbom: flags["sbom"] === "true",
     clearwingDepth: parseClearwingDepth(flags["clearwing-depth"]),
     clearwingBudget: parseOptionalNumber(flags["clearwing-budget"], "clearwing-budget"),
     clearwingTimeout: flags["clearwing-timeout"],
@@ -63,6 +65,7 @@ export function toScanRequest(options: CliRunOptions): ScanRequest {
     artifactsDir: options.artifactsDir ?? defaultArtifactsDir(options.output),
     failOnSeverity: options.failOnSeverity,
     githubToken: readEnv("GITHUB_TOKEN"),
+    sbom: options.sbom,
     clearwing: {
       depth: options.clearwingDepth,
       budget: options.clearwingBudget,

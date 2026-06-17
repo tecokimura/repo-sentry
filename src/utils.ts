@@ -59,6 +59,15 @@ export function defaultArtifactsDir(output?: string): string {
   return `${dirname(output)}/raw`;
 }
 
+export function sbomOutputPath(reportOutput?: string, artifactsDir?: string): string {
+  if (reportOutput) {
+    const dotIndex = reportOutput.lastIndexOf(".");
+    const base = dotIndex >= 0 ? reportOutput.slice(0, dotIndex) : reportOutput;
+    return `${base}.sbom.cdx.json`;
+  }
+  return `${artifactsDir ?? "reports/raw"}/sbom.cdx.json`;
+}
+
 export async function readJsonFile(path: string): Promise<unknown> {
   const text = await Deno.readTextFile(path);
   if (text.trim().length === 0) return [];

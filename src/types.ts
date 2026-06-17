@@ -97,6 +97,7 @@ export interface ScanRequest {
   artifactsDir: string;
   failOnSeverity: Severity;
   githubToken?: string;
+  sbom?: boolean;
   clearwing?: {
     depth?: "quick" | "standard" | "deep";
     budget?: number;

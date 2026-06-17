@@ -1,6 +1,6 @@
 import { completeCollector, failCollector, startCollector } from "./common.ts";
 import type { CollectorResult, Finding, FindingCategory, ScanRequest } from "../types.ts";
-import { ensureDir, readJsonFile, safeErrorMessage, toSeverity } from "../utils.ts";
+import { ensureDir, readJsonFile, safeErrorMessage, sbomOutputPath, toSeverity } from "../utils.ts";
 
 interface TrivyReport {
   Results?: TrivyResult[];
@@ -84,11 +84,38 @@ export async function collectTrivy(request: ScanRequest): Promise<CollectorResul
 
     const report = await readJsonFile(rawReportPath);
     const findings = normalizeTrivyReport(report, rawReportPath);
-    const status = completeCollector("trivy", timing, findings.length, { rawReportPath });
+
+    const notes: string[] = [];
+    if (request.sbom) {
+      const sbomPath = sbomOutputPath(request.output, request.artifactsDir);
+      const sbomError = await generateSbom(request.path, sbomPath);
+      notes.push(sbomError ?? `SBOM generated: ${sbomPath}`);
+    }
+
+    const status = completeCollector("trivy", timing, findings.length, { rawReportPath, notes });
 
     return { status, findings };
   } catch (error) {
     return failCollector("trivy", timing, safeErrorMessage(error), { rawReportPath });
+  }
+}
+
+async function generateSbom(path: string, outputPath: string): Promise<string | undefined> {
+  try {
+    await ensureDir(outputPath.slice(0, outputPath.lastIndexOf("/")));
+    const command = new Deno.Command("trivy", {
+      args: ["fs", "--format", "cyclonedx", "--quiet", "--output", outputPath, path],
+      stdout: "piped",
+      stderr: "piped",
+    });
+    const output = await command.output();
+    if (output.code !== 0) {
+      const stderr = new TextDecoder().decode(output.stderr);
+      return `SBOM generation failed: ${stderr || `trivy exited with ${output.code}`}`;
+    }
+    return undefined;
+  } catch (error) {
+    return `SBOM generation failed: ${safeErrorMessage(error)}`;
   }
 }
 
