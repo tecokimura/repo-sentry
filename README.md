@@ -99,40 +99,50 @@ repo-sentry は、alerts 件数だけでなく、取得元の状態もレポー�
 
 `0 件` と `権限不足で確認不能` は別物として扱います。
 
-## Docker 実行変数
+## Docker 実行オプション
 
-`scripts/docker-scan.sh` は、次の環境変数で動作を変えられます。
+よく使うオプションはコマンドライン引数で指定できます。
 
-| 変数                | 既定値                    | 説明                                                                     |
-| ------------------- | ------------------------- | ------------------------------------------------------------------------ |
-| `REPO_SENTRY_IMAGE` | `repo-sentry:local`       | 実行する Docker image                                                    |
-| `TARGET_PATH`       | 現在のディレクトリ        | スキャン対象ディレクトリ。第一引数でも指定でき、引数が優先               |
-| `REPORTS_DIR`       | `./reports`               | レポート出力先                                                           |
-| `CACHE_DIR`         | `./.repo-sentry`          | Deno / Trivy cache 保存先                                                |
-| `TOOLS`             | `gitleaks,trivy`          | 実行する collector。例: `gitleaks,trivy,dependabot`                      |
-| `FORMAT`            | `markdown`                | 出力形式。`markdown` または `json`                                       |
-| `REPORT_DATE`       | 実行日                    | レポートファイル名の日付                                                 |
-| `REPORT_NAME`       | `repo-sentry-docker-scan` | レポートファイル名のタイトル部分                                         |
-| `REPO`              | 未設定                    | GitHub repository。Dependabot 使用時に `owner/name` 形式で指定           |
-| `SBOM`              | 未設定                    | 空でない値を指定すると CycloneDX SBOM をレポートと同じディレクトリに生成 |
-| `DOCKER_USER`       | `$(id -u):$(id -g)`       | bind mount へ書き込むための Docker 実行ユーザー                          |
+| オプション           | 対応する env 変数 | 既定値                    | 説明                                                 |
+| -------------------- | ----------------- | ------------------------- | ---------------------------------------------------- |
+| `--tools LIST`       | `TOOLS`           | `gitleaks,trivy`          | 実行する collector。カンマ区切り                     |
+| `--format FORMAT`    | `FORMAT`          | `markdown`                | 出力形式。`markdown` または `json`                   |
+| `--sbom`             | `SBOM`            | 未設定                    | 指定すると CycloneDX SBOM をレポートと同じ場所に生成 |
+| `--repo OWNER/NAME`  | `REPO`            | 未設定                    | GitHub repository。Dependabot 使用時に必要           |
+| `--report-name NAME` | `REPORT_NAME`     | `repo-sentry-docker-scan` | レポートファイル名のプレフィックス                   |
 
 例:
 
 ```bash
-TARGET_PATH=/path/to/target-repo \
-REPORTS_DIR="$PWD/reports" \
-REPORT_NAME=my-service-security-scan \
-./scripts/docker-scan.sh
+# gitleaks + trivy + dependabot、SBOM も生成
+./scripts/docker-scan.sh /path/to/target-repo \
+  --tools gitleaks,trivy,dependabot \
+  --sbom \
+  --repo owner/name \
+  --report-name my-service-scan
 ```
-
-JSON で出力する例:
 
 ```bash
-FORMAT=json \
-REPORT_NAME=my-service-security-scan \
-./scripts/docker-scan.sh
+# JSON 形式で出力
+./scripts/docker-scan.sh /path/to/target-repo --format json
 ```
+
+上記以外のオプション(`--fail-on` など)は `--flag=value` 形式で渡すと repo-sentry CLI
+にそのまま転送されます。
+
+```bash
+./scripts/docker-scan.sh /path/to/target-repo --fail-on=critical
+```
+
+CLI オプションは対応する環境変数より優先されます。環境変数でのみ設定できる項目:
+
+| 変数                | 既定値              | 説明                                            |
+| ------------------- | ------------------- | ----------------------------------------------- |
+| `REPO_SENTRY_IMAGE` | `repo-sentry:local` | 実行する Docker image                           |
+| `REPORTS_DIR`       | `./reports`         | レポート出力先                                  |
+| `CACHE_DIR`         | `./.repo-sentry`    | Deno / Trivy cache 保存先                       |
+| `REPORT_DATE`       | 実行日              | レポートファイル名の日付部分                    |
+| `DOCKER_USER`       | `$(id -u):$(id -g)` | bind mount へ書き込むための Docker 実行ユーザー |
 
 ## Secret / API Key 変数
 

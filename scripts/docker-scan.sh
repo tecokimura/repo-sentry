@@ -3,21 +3,26 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: docker-scan.sh [TARGET_DIR] [-- CLI passthrough options]
+Usage: docker-scan.sh [TARGET_DIR] [OPTIONS]
 
-Runs repo-sentry in Docker against TARGET_DIR (default: TARGET_PATH or $PWD).
-Other --* arguments are passed through to the repo-sentry CLI.
-Behavior is configured via environment variables; see README.md
-(REPO_SENTRY_IMAGE, TARGET_PATH, REPORTS_DIR, CACHE_DIR, TOOLS, FORMAT,
-REPORT_DATE, REPORT_NAME, REPO, SBOM, DOCKER_USER).
+Options:
+  --tools LIST          Collectors to run (default: gitleaks,trivy)
+                        Example: --tools gitleaks,trivy,dependabot
+  --format FORMAT       Output format: markdown or json (default: markdown)
+  --sbom                Generate a CycloneDX SBOM alongside the report
+  --repo OWNER/NAME     GitHub repository (required for dependabot)
+  --report-name NAME    Report filename prefix (default: repo-sentry-docker-scan)
+  -h, --help            Show this help
+
+Environment variables can also set defaults (see README.md). CLI options
+take precedence over environment variables.
+
+Unknown --flag=value options are passed through to the repo-sentry CLI
+(e.g. --fail-on=critical, --artifacts-dir=./raw).
 EOF
 }
 
-if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-  usage
-  exit 0
-fi
-
+# Defaults from environment variables
 IMAGE="${REPO_SENTRY_IMAGE:-repo-sentry:local}"
 TARGET_PATH="${TARGET_PATH:-$PWD}"
 REPORTS_DIR="${REPORTS_DIR:-$PWD/reports}"
@@ -28,10 +33,37 @@ REPORT_DATE="${REPORT_DATE:-$(date +%F)}"
 REPORT_NAME="${REPORT_NAME:-repo-sentry-docker-scan}"
 DOCKER_USER="${DOCKER_USER:-$(id -u):$(id -g)}"
 
-if [[ $# -gt 0 && "$1" != --* ]]; then
-  TARGET_PATH="$1"
-  shift
-fi
+# Parse arguments — script-level flags are consumed; unknown --* are collected
+# for passthrough to the container CLI (use --flag=value form for those).
+passthrough_args=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      usage; exit 0 ;;
+    --tools)
+      TOOLS="$2"; shift 2 ;;
+    --tools=*)
+      TOOLS="${1#*=}"; shift ;;
+    --format)
+      FORMAT="$2"; shift 2 ;;
+    --format=*)
+      FORMAT="${1#*=}"; shift ;;
+    --sbom)
+      SBOM=true; shift ;;
+    --repo)
+      REPO="$2"; shift 2 ;;
+    --repo=*)
+      REPO="${1#*=}"; shift ;;
+    --report-name)
+      REPORT_NAME="$2"; shift 2 ;;
+    --report-name=*)
+      REPORT_NAME="${1#*=}"; shift ;;
+    --*)
+      passthrough_args+=("$1"); shift ;;
+    *)
+      TARGET_PATH="$1"; shift ;;
+  esac
+done
 
 if [[ ! -d "$TARGET_PATH" ]]; then
   echo "scan target must be an existing directory: $TARGET_PATH" >&2
@@ -78,4 +110,4 @@ docker run --rm \
   --tools "$TOOLS" \
   --format "$FORMAT" \
   --output "/workspace/reports/${REPORT_DATE}_${REPORT_NAME}.${extension}" \
-  "$@"
+  ${passthrough_args[@]+"${passthrough_args[@]}"}
