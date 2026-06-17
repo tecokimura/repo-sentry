@@ -12,6 +12,14 @@ repo-sentry は、GitHub リポジトリを複数のセキュリティツール�
 
 ホストに `gitleaks` や `trivy` を直接インストールする必要はありません。基本は Docker で実行します。
 
+## 動作要件
+
+- Docker (Engine 20.10 以上)
+- bash
+
+ホスト側に `gitleaks` や `trivy`、`deno` を別途インストールする必要はありません。 すべて Docker
+image 内にパッケージされています。
+
 ## Quick Start
 
 1. Docker image を build します。
@@ -20,20 +28,29 @@ repo-sentry は、GitHub リポジトリを複数のセキュリティツール�
 ./scripts/docker-build.sh
 ```
 
-2. カレントディレクトリをスキャンします。
+初回 build は gitleaks と Trivy のダウンロードがあるため 3〜5 分ほどかかります。 build が成功すると
+`Successfully tagged repo-sentry:local` のようなメッセージが出ます。
+
+2. スキャンしたいリポジトリのディレクトリで実行します。
 
 ```bash
+# カレントディレクトリをスキャン
 ./scripts/docker-scan.sh
-```
 
-別のディレクトリをスキャンする場合は、第一引数で指定できます。
-
-```bash
+# 別のディレクトリを指定する場合
 ./scripts/docker-scan.sh /path/to/target-repo
 ```
 
-指定したディレクトリが存在しない場合は終了コード `2` で終了します。なお `gitleaks` は git
-履歴を前提とするため、git 管理されていないディレクトリでは collector が失敗します。
+> **注意:** `gitleaks` は git 履歴を前提とするため、スキャン対象は git 管理されたディレクトリを
+> 指定してください。git 管理外のディレクトリでは gitleaks collector が失敗します(終了コード `3`)。
+
+スキャン完了後、終了コードで結果を確認できます。
+
+```bash
+./scripts/docker-scan.sh /path/to/target-repo
+echo "exit: $?"
+# 0 → finding なし  1 → high 以上の finding あり  3 → collector エラー
+```
 
 3. レポートを確認します。
 
@@ -127,9 +144,16 @@ secret は CLI 引数ではなく環境変数で渡します。repo-sentry は t
 | `SLACK_WEBHOOK_URL` | Slack 通知用                                                   | Slack reporter 実装後 |
 | `OPENAI_API_KEY`    | Clearwing が外部 LLM provider を使う場合                       | Clearwing 実装後      |
 
-Dependabot 用の `GITHUB_TOKEN` は、対象 repository の Dependabot alerts
-を読める権限が必要です。fine-grained token を使う場合は Dependabot alerts の read
-権限を付けてください。
+`gitleaks` と `trivy` のみ使用する場合、`GITHUB_TOKEN` は不要です。
+
+Dependabot 用の `GITHUB_TOKEN` に必要な権限:
+
+| token 種別         | 必要な権限                                       |
+| ------------------ | ------------------------------------------------ |
+| classic token      | `repo`(private repo) または public repo なら不要 |
+| fine-grained token | `Dependabot alerts: Read-only`                   |
+
+権限が不足していると collector は `permission_missing` として記録され、終了コード `4` になります。
 
 ## Build 変数
 
@@ -261,6 +285,35 @@ JSON レポートは次のような形です。
 複数の条件に該当する場合は `4` > `3` > `1` の優先順位で返します。たとえば collector の一部が失敗し、
 かつ policy 閾値以上の finding がある場合の終了コードは `3` です。CI で finding
 の有無だけを見る場合も `1` 以外の非ゼロ終了コードを失敗として扱ってください。
+
+## よくある失敗と対処
+
+**`Cannot connect to the Docker daemon` と出る**
+
+Docker が起動していません。Docker Desktop または Docker Engine を起動してください。
+
+**`Unable to find image 'repo-sentry:local'` と出る**
+
+image がまだ build されていません。先に `./scripts/docker-build.sh` を実行してください。
+
+**`gitleaks collector` が失敗して終了コード `3` になる**
+
+スキャン対象が git 管理されていないディレクトリです。`git init`
+済みのリポジトリを対象にしてください。
+
+**Dependabot collector が `permission_missing` になる**
+
+`GITHUB_TOKEN` が設定されていないか権限が不足しています。`gitleaks` と `trivy` だけで十分な場合は
+`TOOLS=gitleaks,trivy` で Dependabot を外して実行できます。
+
+```bash
+TOOLS=gitleaks,trivy ./scripts/docker-scan.sh /path/to/target-repo
+```
+
+**レポートファイルが空または生成されない**
+
+`reports/` ディレクトリへの書き込み権限を確認してください。`DOCKER_USER` の既定値は
+`$(id -u):$(id -g)` のため、通常は問題になりません。
 
 ## 現在の実装状態
 
