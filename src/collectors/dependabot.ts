@@ -102,7 +102,7 @@ export async function collectDependabot(request: ScanRequest): Promise<Collector
     const vulnerabilityEndpointWas404 = vulnerabilityStatus.status === 404;
 
     const alertsResponse = await githubFetch(
-      `/repos/${request.repo}/dependabot/alerts?state=open`,
+      `/repos/${request.repo}/dependabot/alerts?state=open&per_page=100`,
       request.githubToken,
     );
 
@@ -137,6 +137,22 @@ export async function collectDependabot(request: ScanRequest): Promise<Collector
     }
 
     const alerts = await alertsResponse.json() as DependabotAlert[];
+
+    let nextUrl = nextPageUrl(alertsResponse.headers.get("link"));
+    while (nextUrl) {
+      const pageResponse = await githubFetch(nextUrl, request.githubToken);
+      if (!pageResponse.ok) {
+        return failCollector(
+          "dependabot",
+          timing,
+          `Dependabot alerts API returned ${pageResponse.status} while paginating`,
+          { sourceStatus: "unknown" },
+        );
+      }
+      alerts.push(...await pageResponse.json() as DependabotAlert[]);
+      nextUrl = nextPageUrl(pageResponse.headers.get("link"));
+    }
+
     const findings = normalizeDependabotAlerts(alerts);
     const sourceStatus: DependabotSourceStatus = findings.length > 0
       ? "enabled_with_alerts"
@@ -193,8 +209,18 @@ function toFindingStatus(state: unknown): FindingStatus {
   return "unknown";
 }
 
-function githubFetch(path: string, token: string): Promise<Response> {
-  return fetch(`${githubApiBase}${path}`, {
+function nextPageUrl(linkHeader: string | null): string | undefined {
+  if (!linkHeader) return undefined;
+  for (const part of linkHeader.split(",")) {
+    const match = part.match(/<([^>]+)>\s*;\s*rel="next"/);
+    if (match && match[1].startsWith(githubApiBase)) return match[1];
+  }
+  return undefined;
+}
+
+function githubFetch(pathOrUrl: string, token: string): Promise<Response> {
+  const url = pathOrUrl.startsWith(githubApiBase) ? pathOrUrl : `${githubApiBase}${pathOrUrl}`;
+  return fetch(url, {
     headers: {
       "Accept": "application/vnd.github+json",
       "Authorization": `Bearer ${token}`,

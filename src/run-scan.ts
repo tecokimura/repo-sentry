@@ -11,11 +11,9 @@ import type {
 import { nowIso, summarizeSeverities } from "./utils.ts";
 
 export async function runScan(request: ScanRequest): Promise<ScanReport> {
-  const collectorResults: CollectorResult[] = [];
-
-  for (const tool of request.tools) {
-    collectorResults.push(await runCollector(tool, request));
-  }
+  const collectorResults: CollectorResult[] = await Promise.all(
+    request.tools.map((tool) => runCollector(tool, request)),
+  );
 
   const findings = collectorResults.flatMap((result) => result.findings);
   const collectorStatuses = collectorResults.map((result) => result.status);

@@ -59,6 +59,8 @@ export async function collectTrivy(request: ScanRequest): Promise<CollectorResul
     const command = new Deno.Command("trivy", {
       args: [
         "fs",
+        "--scanners",
+        "vuln,misconfig",
         "--format",
         "json",
         "--quiet",

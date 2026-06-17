@@ -6,7 +6,8 @@ repo-sentry は、GitHub リポジトリを複数のセキュリティツール�
 現在の MVP では、Docker image 内で次を実行できます。
 
 - `gitleaks`: シークレット漏洩チェック
-- `trivy`: 依存関係、コンテナ、IaC、設定ファイルの既知脆弱性チェック
+- `trivy`: 依存関係の既知脆弱性と、IaC・設定ファイルの misconfiguration チェック。secret 検出は
+  `gitleaks` に委ねるため scanner を `vuln,misconfig` に限定しています
 - `dependabot`: GitHub Dependabot alerts API の取得と有効状態診断
 
 ホストに `gitleaks` や `trivy` を直接インストールする必要はありません。基本は Docker で実行します。
@@ -24,6 +25,15 @@ repo-sentry は、GitHub リポジトリを複数のセキュリティツール�
 ```bash
 ./scripts/docker-scan.sh
 ```
+
+別のディレクトリをスキャンする場合は、第一引数で指定できます。
+
+```bash
+./scripts/docker-scan.sh /path/to/target-repo
+```
+
+指定したディレクトリが存在しない場合は終了コード `2` で終了します。なお `gitleaks` は git
+履歴を前提とするため、git 管理されていないディレクトリでは collector が失敗します。
 
 3. レポートを確認します。
 
@@ -79,7 +89,7 @@ repo-sentry は、alerts 件数だけでなく、取得元の状態もレポー�
 | 変数                | 既定値                    | 説明                                                           |
 | ------------------- | ------------------------- | -------------------------------------------------------------- |
 | `REPO_SENTRY_IMAGE` | `repo-sentry:local`       | 実行する Docker image                                          |
-| `TARGET_PATH`       | 現在のディレクトリ        | スキャン対象ディレクトリ                                       |
+| `TARGET_PATH`       | 現在のディレクトリ        | スキャン対象ディレクトリ。第一引数でも指定でき、引数が優先     |
 | `REPORTS_DIR`       | `./reports`               | レポート出力先                                                 |
 | `CACHE_DIR`         | `./.repo-sentry`          | Deno / Trivy cache 保存先                                      |
 | `TOOLS`             | `gitleaks,trivy`          | 実行する collector。例: `gitleaks,trivy,dependabot`            |
@@ -247,6 +257,10 @@ JSON レポートは次のような形です。
 |        `2` | CLI 引数や config が不正                 |
 |        `3` | collector 実行エラー                     |
 |        `4` | 必須権限または token 不足                |
+
+複数の条件に該当する場合は `4` > `3` > `1` の優先順位で返します。たとえば collector の一部が失敗し、
+かつ policy 閾値以上の finding がある場合の終了コードは `3` です。CI で finding
+の有無だけを見る場合も `1` 以外の非ゼロ終了コードを失敗として扱ってください。
 
 ## 現在の実装状態
 
