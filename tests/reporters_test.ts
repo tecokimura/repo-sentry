@@ -6,7 +6,7 @@ import { assert, assertEquals } from "./assert.ts";
 Deno.test("renderMarkdownReport includes collector statuses and findings", () => {
   const markdown = renderMarkdownReport(sampleReport());
 
-  assert(markdown.includes("## Collector Statuses"));
+  assert(markdown.includes("## Collector 実行結果"));
   assert(markdown.includes("enabled_no_alerts"));
   assert(markdown.includes("Possible token"));
 });

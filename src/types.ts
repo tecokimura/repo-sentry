@@ -51,6 +51,7 @@ export interface Finding {
   identifiers?: string[];
   packageName?: string;
   packageVersion?: string;
+  fixedVersion?: string;
   confidence?: Confidence;
   evidenceLevel?: EvidenceLevel;
   rawReportPath?: string;

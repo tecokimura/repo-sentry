@@ -160,11 +160,11 @@ function normalizeVulnerability(
     identifiers: vulnerability.VulnerabilityID ? [vulnerability.VulnerabilityID] : [],
     packageName: vulnerability.PkgName,
     packageVersion: vulnerability.InstalledVersion,
+    fixedVersion: vulnerability.FixedVersion,
     rawReportPath,
     raw: {
       target: result.Target,
       type: result.Type,
-      fixedVersion: vulnerability.FixedVersion,
     },
   };
 }
