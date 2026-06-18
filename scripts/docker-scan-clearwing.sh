@@ -50,6 +50,7 @@ echo "[clearwing] Ollamaコンテナを起動中 (model: ${OLLAMA_MODEL})..." >&
 docker run -d \
   --name "$_CONTAINER" \
   --network "$_NETWORK" \
+  -e OLLAMA_HOST=0.0.0.0 \
   -v "${OLLAMA_VOLUME}:/root/.ollama" \
   "$OLLAMA_IMAGE" >/dev/null
 
