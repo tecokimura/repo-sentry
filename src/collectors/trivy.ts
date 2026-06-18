@@ -104,7 +104,17 @@ async function generateSbom(path: string, outputPath: string): Promise<string | 
   try {
     await ensureDir(outputPath.slice(0, outputPath.lastIndexOf("/")));
     const command = new Deno.Command("trivy", {
-      args: ["fs", "--format", "cyclonedx", "--quiet", "--output", outputPath, path],
+      args: [
+        "fs",
+        "--scanners",
+        "vuln",
+        "--format",
+        "cyclonedx",
+        "--quiet",
+        "--output",
+        outputPath,
+        path,
+      ],
       stdout: "piped",
       stderr: "piped",
     });
@@ -113,9 +123,56 @@ async function generateSbom(path: string, outputPath: string): Promise<string | 
       const stderr = new TextDecoder().decode(output.stderr);
       return `SBOM generation failed: ${stderr || `trivy exited with ${output.code}`}`;
     }
+    await annotateSbom(outputPath, path);
     return undefined;
   } catch (error) {
     return `SBOM generation failed: ${safeErrorMessage(error)}`;
+  }
+}
+
+async function annotateSbom(sbomPath: string, scanTarget: string): Promise<void> {
+  try {
+    const raw = await Deno.readTextFile(sbomPath);
+    const sbom = JSON.parse(raw) as Record<string, unknown>;
+    const metadata = (sbom.metadata ?? {}) as Record<string, unknown>;
+    const existing = Array.isArray(metadata.properties) ? (metadata.properties as unknown[]) : [];
+
+    const props: Array<{ name: string; value: string }> = [
+      { name: "repo-sentry:scan:target", value: scanTarget },
+      { name: "repo-sentry:scan:scanners", value: "vuln" },
+    ];
+
+    const dbDate = await getTrivyDbDate();
+    if (dbDate) props.push({ name: "repo-sentry:scan:dbUpdatedAt", value: dbDate });
+
+    const componentCount = Array.isArray(sbom.components) ? sbom.components.length : 0;
+    props.push({ name: "repo-sentry:scan:componentCount", value: String(componentCount) });
+    if (componentCount === 0) {
+      props.push({ name: "repo-sentry:scan:status", value: "no_components_found" });
+    }
+
+    metadata.properties = [...existing, ...props];
+    sbom.metadata = metadata;
+    await Deno.writeTextFile(sbomPath, JSON.stringify(sbom, null, 2));
+  } catch {
+    // best-effort; don't fail SBOM generation if annotation fails
+  }
+}
+
+async function getTrivyDbDate(): Promise<string | undefined> {
+  try {
+    const cmd = new Deno.Command("trivy", {
+      args: ["version", "--format", "json"],
+      stdout: "piped",
+      stderr: "piped",
+    });
+    const out = await cmd.output();
+    if (out.code !== 0) return undefined;
+    const json = JSON.parse(new TextDecoder().decode(out.stdout)) as Record<string, unknown>;
+    const db = json["VulnerabilityDB"] as Record<string, string> | undefined;
+    return db?.["UpdatedAt"];
+  } catch {
+    return undefined;
   }
 }
 
