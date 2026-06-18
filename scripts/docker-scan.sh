@@ -58,6 +58,10 @@ while [[ $# -gt 0 ]]; do
       REPORT_NAME="$2"; shift 2 ;;
     --report-name=*)
       REPORT_NAME="${1#*=}"; shift ;;
+    --docker-network)
+      DOCKER_NETWORK="$2"; shift 2 ;;
+    --docker-network=*)
+      DOCKER_NETWORK="${1#*=}"; shift ;;
     --*)
       passthrough_args+=("$1"); shift ;;
     *)
@@ -99,11 +103,11 @@ if [[ -f "${ENV_FILE:-.env}" ]]; then
   _env_file_args=(--env-file "${ENV_FILE:-.env}")
 fi
 
-# Clearwing連携用の内部フック: docker-scan-clearwing.sh がOllamaネットワークを注入するために使用
-# このフックを削除したい場合は以下4行と docker run の _network_args 展開を削除する
+# Clearwing連携用: --docker-network で指定されたネットワークにコンテナを接続する
+# Clearwingを削除する場合はこの4行と docker run の _network_args 展開を削除する
 _network_args=()
-if [[ -n "${_DOCKER_OPTS_NETWORK:-}" ]]; then
-  _network_args=(--network "$_DOCKER_OPTS_NETWORK")
+if [[ -n "${DOCKER_NETWORK:-}" ]]; then
+  _network_args=(--network "$DOCKER_NETWORK")
 fi
 
 docker run --rm \

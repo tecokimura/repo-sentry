@@ -103,9 +103,6 @@ case "$_format" in
 esac
 _report_path="${_report_dir}/${_report_date}_${_report_name}.${_ext}"
 
-# _DOCKER_OPTS_NETWORK を export して docker-scan.sh に確実に渡す
-export _DOCKER_OPTS_NETWORK="$_NETWORK"
-
 if [[ $_debug -eq 1 ]]; then
   echo "[clearwing] [debug] OLLAMA_HOST : http://${_CONTAINER}:11434" >&2
   echo "[clearwing] [debug] NETWORK     : $_NETWORK" >&2
@@ -116,13 +113,14 @@ if [[ $_debug -eq 1 ]]; then
 fi
 
 # docker-scan.sh を呼び出す（終了コードを保存）
-# _DOCKER_OPTS_NETWORK: repo-sentryコンテナをOllamaと同じネットワークに接続させる内部フック（上でexport済み）
+# --docker-network: repo-sentryコンテナをOllamaと同じネットワークに接続させる
 # OLLAMA_HOST: コンテナ名でOllamaを参照（Dockerネットワーク内のDNS解決）
 _scan_exit=0
 TOOLS="$_tools" \
 OLLAMA_HOST="http://${_CONTAINER}:11434" \
 OLLAMA_MODEL="$OLLAMA_MODEL" \
   "$SCRIPT_DIR/docker-scan.sh" \
+  --docker-network "$_NETWORK" \
   --clearwing-ack-risk \
   "${_pass_args[@]+"${_pass_args[@]}"}" || _scan_exit=$?
 
