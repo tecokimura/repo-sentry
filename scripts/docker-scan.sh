@@ -5,20 +5,28 @@ usage() {
   cat <<'EOF'
 Usage: docker-scan.sh [TARGET_DIR] [OPTIONS]
 
+デフォルト動作（オプション省略時）:
+  gitleaks + trivy でスキャン、Markdown レポートと CycloneDX SBOM を reports/ に出力。
+  high 以上の finding があれば終了コード 1。
+
 Options:
-  --tools LIST          Collectors to run (default: gitleaks,trivy)
-                        Example: --tools gitleaks,trivy,dependabot
-  --format FORMAT       Output format: markdown or json (default: markdown)
-  --no-sbom             Skip CycloneDX SBOM generation (SBOM is on by default)
-  --repo OWNER/NAME     GitHub repository (required for dependabot)
-  --report-name NAME    Report filename prefix (default: repo-sentry-docker-scan)
-  -h, --help            Show this help
+  TARGET_DIR            スキャン対象ディレクトリ (default: カレントディレクトリ)
+  --tools LIST          実行する collector (default: gitleaks,trivy)
+                        値: gitleaks, trivy, dependabot, clearwing (カンマ区切り)
+  --format FORMAT       出力形式 (default: markdown)
+                        値: markdown, json
+  --no-sbom             SBOM 生成をスキップ (既定では CycloneDX SBOM を生成)
+  --repo OWNER/NAME     GitHub repository (dependabot 使用時に必須)
+  --report-name NAME    レポートファイル名のプレフィックス (default: repo-sentry-docker-scan)
+  -h, --help            このヘルプを表示
 
-Environment variables can also set defaults (see README.md). CLI options
-take precedence over environment variables.
+repo-sentry CLI に直接渡せるオプション (--flag=value 形式):
+  --fail-on=SEVERITY    終了コード 1 の閾値 (default: high)
+                        値: critical, high, medium, low
+  --artifacts-dir=PATH  raw scanner output (gitleaks/trivy JSON) の保存先
 
-Unknown --flag=value options are passed through to the repo-sentry CLI
-(e.g. --fail-on=critical, --artifacts-dir=./raw).
+環境変数でデフォルト値を変更できます (CLI オプションが優先):
+  TOOLS, FORMAT, SBOM, REPO, REPORT_NAME, REPORTS_DIR, CACHE_DIR, REPORT_DATE, DOCKER_USER
 EOF
 }
 

@@ -157,7 +157,7 @@ Ollama は起動しません。シンプルに gitleaks + trivy の結果のみ�
 
 1. Ollama コンテナを自動起動
 2. モデルが未ダウンロードの場合は取得（初回のみ、約 2 GB）
-3. スキャンを実行し、critical / high の finding に LLM 分析を追加
+3. スキャンを実行し、critical / high / medium の finding に LLM 分析を追加（standard モード）
 4. スキャン完了後に Ollama コンテナを自動停止・削除
 
 > **初回実行について:** `llama3.2` モデル（約 2 GB）のダウンロードが発生します。
@@ -166,35 +166,6 @@ Ollama は起動しません。シンプルに gitleaks + trivy の結果のみ�
 
 モデルは `.env` の `OLLAMA_MODEL` で変更できます（既定値: `llama3.2`）。
 
-### 分析の深さを変える
-
-既定では critical / high / medium の finding を分析します（`standard` モード）。
-finding が多すぎる場合は `--clearwing-depth=priority` で絞れます。
-
-| 値           | 分析対象                          |
-| ------------ | --------------------------------- |
-| `priority`   | critical / high のみ              |
-| `standard`   | critical / high / medium（既定）  |
-| `verbose`    | info / unknown を除くすべて       |
-
-```bash
-# 標準（デフォルト）: critical / high / medium を分析
-./scripts/docker-scan-clearwing.sh /path/to/target-repo
-
-# mediumが多くて時間がかかる場合: critical / high のみに絞る
-./scripts/docker-scan-clearwing.sh /path/to/target-repo --clearwing-depth=priority
-
-# すべての finding を分析したい場合
-./scripts/docker-scan-clearwing.sh /path/to/target-repo --clearwing-depth=verbose
-
-# dependabot も含めてスキャン + LLM 分析
-./scripts/docker-scan-clearwing.sh /path/to/target-repo \
-  --repo owner/name \
-  --tools gitleaks,trivy,dependabot,clearwing
-
-# JSON 形式で出力
-./scripts/docker-scan-clearwing.sh /path/to/target-repo --format json
-```
 
 ### Clearwing を完全に削除する場合
 
@@ -220,37 +191,81 @@ docker volume rm repo-sentry-ollama-models
 
 ## Docker 実行オプション
 
-よく使うオプションはコマンドライン引数で指定できます。
+### docker-scan.sh
 
-| オプション           | 対応する env 変数 | 既定値                    | 説明                                                 |
-| -------------------- | ----------------- | ------------------------- | ---------------------------------------------------- |
-| `--tools LIST`       | `TOOLS`           | `gitleaks,trivy`          | 実行する collector。カンマ区切り                     |
-| `--format FORMAT`    | `FORMAT`          | `markdown`                | 出力形式。`markdown` または `json`                   |
-| `--sbom`             | `SBOM`            | 未設定                    | 指定すると CycloneDX SBOM をレポートと同じ場所に生成 |
-| `--repo OWNER/NAME`  | `REPO`            | 未設定                    | GitHub repository。Dependabot 使用時に必要           |
-| `--report-name NAME` | `REPORT_NAME`     | `repo-sentry-docker-scan` | レポートファイル名のプレフィックス                   |
+デフォルト動作（オプション省略時）: `gitleaks + trivy` でスキャン、Markdown レポートと CycloneDX SBOM を `reports/` に出力。
+
+| オプション              | 対応する env 変数 | 既定値                    | 説明                                                      |
+| ----------------------- | ----------------- | ------------------------- | --------------------------------------------------------- |
+| `TARGET_DIR`            | `TARGET_PATH`     | カレントディレクトリ      | スキャン対象ディレクトリ                                  |
+| `--tools LIST`          | `TOOLS`           | `gitleaks,trivy`          | 実行する collector。カンマ区切り                          |
+| `--format FORMAT`       | `FORMAT`          | `markdown`                | 出力形式。`markdown` または `json`                        |
+| `--no-sbom`             | `SBOM=false`      | **SBOM 有効**             | 指定すると CycloneDX SBOM 生成をスキップ                  |
+| `--repo OWNER/NAME`     | `REPO`            | 未設定                    | GitHub repository。Dependabot 使用時に必須                |
+| `--report-name NAME`    | `REPORT_NAME`     | `repo-sentry-docker-scan` | レポートファイル名のプレフィックス                        |
+| `--fail-on=SEVERITY`    | —                 | `high`                    | 終了コード 1 の閾値。`critical/high/medium/low` を指定可  |
+| `--artifacts-dir=PATH`  | —                 | 未設定                    | raw scanner output (gitleaks/trivy JSON) の保存先         |
+
+`--fail-on` と `--artifacts-dir` は `--flag=value` 形式で repo-sentry CLI に直接転送されます。
 
 例:
 
 ```bash
-# gitleaks + trivy + dependabot、SBOM も生成
+# gitleaks + trivy + dependabot（SBOM はデフォルトで生成される）
 ./scripts/docker-scan.sh /path/to/target-repo \
   --tools gitleaks,trivy,dependabot \
-  --sbom \
   --repo owner/name \
   --report-name my-service-scan
-```
 
-```bash
+# SBOM を生成しない
+./scripts/docker-scan.sh /path/to/target-repo --no-sbom
+
+# critical のみを失敗扱いにする
+./scripts/docker-scan.sh /path/to/target-repo --fail-on=critical
+
 # JSON 形式で出力
 ./scripts/docker-scan.sh /path/to/target-repo --format json
 ```
 
-上記以外のオプション(`--fail-on` など)は `--flag=value` 形式で渡すと repo-sentry CLI
-にそのまま転送されます。
+### docker-scan-clearwing.sh
+
+デフォルト動作: `gitleaks + trivy + clearwing` でスキャン、critical/high/medium を LLM 分析、Markdown レポートと SBOM を出力。
+
+| オプション                    | 既定値           | 説明                                                             |
+| ----------------------------- | ---------------- | ---------------------------------------------------------------- |
+| `TARGET_DIR`                  | カレントディレクトリ | スキャン対象ディレクトリ                               |
+| `--tools LIST`                | `gitleaks,trivy,clearwing` | 実行する collector                               |
+| `--format FORMAT`             | `markdown`       | 出力形式。`markdown` または `json`                               |
+| `--no-sbom`                   | **SBOM 有効**    | 指定すると SBOM 生成をスキップ                                   |
+| `--clearwing-depth=DEPTH`     | `standard`       | LLM 分析の対象範囲                                               |
+| `--repo OWNER/NAME`           | 未設定           | GitHub repository。Dependabot 使用時に必須                       |
+| `--fail-on=SEVERITY`          | `high`           | 終了コード 1 の閾値                                              |
+| `--debug`                     | オフ             | 診断ログを常時表示（エラー時は自動表示）                         |
+
+`--clearwing-depth` の値:
+
+| 値           | 分析対象                          |
+| ------------ | --------------------------------- |
+| `priority`   | critical / high のみ              |
+| `standard`   | critical / high / medium（既定）  |
+| `verbose`    | info / unknown を除くすべて       |
+
+例:
 
 ```bash
-./scripts/docker-scan.sh /path/to/target-repo --fail-on=critical
+# 標準（デフォルト）
+./scripts/docker-scan-clearwing.sh /path/to/target-repo
+
+# critical / high のみ分析（finding が多く時間がかかる場合）
+./scripts/docker-scan-clearwing.sh /path/to/target-repo --clearwing-depth=priority
+
+# dependabot も含めてスキャン
+./scripts/docker-scan-clearwing.sh /path/to/target-repo \
+  --repo owner/name \
+  --tools gitleaks,trivy,dependabot,clearwing
+
+# SBOM なし・JSON 形式
+./scripts/docker-scan-clearwing.sh /path/to/target-repo --no-sbom --format json
 ```
 
 CLI オプションは対応する環境変数より優先されます。環境変数でのみ設定できる項目:
@@ -260,7 +275,7 @@ CLI オプションは対応する環境変数より優先されます。環境�
 | `REPO_SENTRY_IMAGE` | `repo-sentry:local` | 実行する Docker image                           |
 | `REPORTS_DIR`       | `./reports`         | レポート出力先                                  |
 | `CACHE_DIR`         | `./.repo-sentry`    | Deno / Trivy cache 保存先                       |
-| `REPORT_DATE`       | 実行日              | レポートファイル名の日付部分                    |
+| `REPORT_DATE`       | 実行日時            | レポートファイル名の日時部分（形式: YYMMDDHHMM）|
 | `DOCKER_USER`       | `$(id -u):$(id -g)` | bind mount へ書き込むための Docker 実行ユーザー |
 
 ## Secret / API Key 変数
@@ -450,16 +465,18 @@ TOOLS=gitleaks,trivy ./scripts/docker-scan.sh /path/to/target-repo
 Docker Hub からの `ollama/ollama` イメージ取得に時間がかかっている可能性があります（初回のみ）。
 ネットワーク環境を確認して再実行してください。
 
-**Clearwing の LLM 分析が遅い**
+**Clearwing の LLM 分析が遅い / 時間がかかりすぎる**
 
 Mac の Docker は Apple Silicon GPU（Metal）が使えないため、CPU のみで推論します。
-`llama3.2`（3B）であれば通常 30〜80 秒 / finding 程度です。件数が多い場合は
-`--clearwing-depth=quick`（既定）のまま使うか、Mac ネイティブ Ollama への移行を検討してください。
+`llama3.2`（3B）であれば通常 20〜60 秒 / finding 程度です。
+`standard` モード（既定）では critical / high / medium を分析するため、medium の件数が多いと
+時間がかかります。`--clearwing-depth=priority` で critical / high のみに絞れます。
 
-**Clearwing の分析に時間がかかりすぎる**
+```bash
+./scripts/docker-scan-clearwing.sh /path/to/target-repo --clearwing-depth=priority
+```
 
-`standard` モード（既定）では critical / high / medium を分析します。medium の件数が多い場合は
-`--clearwing-depth=priority` で critical / high のみに絞れます。
+Mac ネイティブ Ollama への移行も選択肢の一つです（後述）。
 
 ## 現在の実装状態
 
@@ -473,7 +490,7 @@ Mac の Docker は Apple Silicon GPU（Metal）が使えないため、CPU の�
 - Clearwing collector（Ollama による LLM 分析）
 - JSON reporter
 - Markdown reporter
-- CycloneDX SBOM 生成（`--sbom`）
+- CycloneDX SBOM 生成（デフォルト有効、`--no-sbom` で無効化）
 - fixture ベースの tests
 
 未実装または後続予定:

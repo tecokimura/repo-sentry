@@ -4,31 +4,67 @@
 # Ollamaコンテナを起動してスキャンを実行し、終了後にコンテナを停止する。
 # モデルデータは Docker ボリューム repo-sentry-ollama-models に保存される（初回ダウンロード後は再利用）。
 #
-# 使い方:
-#   ./scripts/docker-scan-clearwing.sh [TARGET_DIR] [OPTIONS]
-#   OPTIONS は docker-scan.sh と同様（--tools, --format, --repo 等）
-#   --debug を付けると診断ログを常時表示する
-#
 # Ollamaを完全に削除する場合（速度が問題な場合など）:
 #   1. このスクリプトを削除
 #   2. docker rmi ollama/ollama
 #   3. docker volume rm repo-sentry-ollama-models
 #   ※ docker-scan.sh の変更は不要
 
+usage() {
+  cat <<'EOF'
+Usage: docker-scan-clearwing.sh [TARGET_DIR] [OPTIONS]
+
+Ollama コンテナを起動し、LLM 分析（Clearwing）付きでスキャンを実行します。
+
+デフォルト動作（オプション省略時）:
+  gitleaks + trivy でスキャン → critical/high/medium の finding を LLM 分析。
+  Markdown レポートと CycloneDX SBOM を reports/ に出力。
+  high 以上の finding があれば終了コード 1。
+
+Options:
+  TARGET_DIR                    スキャン対象ディレクトリ (default: カレントディレクトリ)
+  --tools LIST                  実行する collector (default: gitleaks,trivy,clearwing)
+                                値: gitleaks, trivy, dependabot, clearwing (カンマ区切り)
+  --format FORMAT               出力形式 (default: markdown)
+                                値: markdown, json
+  --no-sbom                     SBOM 生成をスキップ (既定では CycloneDX SBOM を生成)
+  --repo OWNER/NAME             GitHub repository (dependabot 使用時に必須)
+  --report-name NAME            レポートファイル名のプレフィックス (default: repo-sentry-docker-scan)
+  --clearwing-depth=DEPTH       LLM 分析の深さ (default: standard)
+                                値: priority (critical/high のみ), standard (+ medium), verbose (+ low)
+  --fail-on=SEVERITY            終了コード 1 の閾値 (default: high)
+                                値: critical, high, medium, low
+  --debug                       診断ログを常時表示 (エラー時は自動表示)
+  -h, --help                    このヘルプを表示
+
+環境変数:
+  OLLAMA_MODEL                  使用するモデル (default: llama3.2、.env でも設定可)
+  TOOLS, FORMAT, SBOM, REPO, REPORT_NAME, REPORTS_DIR, CACHE_DIR, REPORT_DATE
+
+所要時間の目安 (llama3.2 / CPU / standard モード):
+  finding 1 件につき 20〜60 秒。Mac スリープを防ぐには caffeinate -i を使用してください。
+
+Ollama を完全に削除する場合:
+  rm scripts/docker-scan-clearwing.sh
+  docker rmi ollama/ollama
+  docker volume rm repo-sentry-ollama-models
+EOF
+}
+
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 _START_SECONDS=$SECONDS
 
-# --debug フラグをここで処理し、docker-scan.sh には渡さない
+# --debug / --help フラグをここで処理し、docker-scan.sh には渡さない
 _debug=0
 _pass_args=()
 for _arg in "$@"; do
-  if [[ "$_arg" == "--debug" ]]; then
-    _debug=1
-  else
-    _pass_args+=("$_arg")
-  fi
+  case "$_arg" in
+    --debug) _debug=1 ;;
+    -h|--help) usage; exit 0 ;;
+    *) _pass_args+=("$_arg") ;;
+  esac
 done
 
 # .envからOLLAMA_MODELを読む（シェル変数が未設定の場合）
