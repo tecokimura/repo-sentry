@@ -103,23 +103,25 @@ case "$_format" in
 esac
 _report_path="${_report_dir}/${_report_date}_${_report_name}.${_ext}"
 
+# _DOCKER_OPTS_NETWORK を export して docker-scan.sh に確実に渡す
+export _DOCKER_OPTS_NETWORK="$_NETWORK"
+
 if [[ $_debug -eq 1 ]]; then
   echo "[clearwing] [debug] OLLAMA_HOST : http://${_CONTAINER}:11434" >&2
   echo "[clearwing] [debug] NETWORK     : $_NETWORK" >&2
   echo "[clearwing] [debug] Ollamaコンテナのネットワーク情報:" >&2
-  docker inspect "$_CONTAINER" \
+  { docker inspect "$_CONTAINER" \
     --format '  name={{.Name}} status={{.State.Status}} ip={{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \
-    2>/dev/null >&2 || echo "  (コンテナ情報取得失敗)" >&2
+    2>/dev/null || echo "  (コンテナ情報取得失敗)"; } >&2
 fi
 
 # docker-scan.sh を呼び出す（終了コードを保存）
-# _DOCKER_OPTS_NETWORK: repo-sentryコンテナをOllamaと同じネットワークに接続させる内部フック
+# _DOCKER_OPTS_NETWORK: repo-sentryコンテナをOllamaと同じネットワークに接続させる内部フック（上でexport済み）
 # OLLAMA_HOST: コンテナ名でOllamaを参照（Dockerネットワーク内のDNS解決）
 _scan_exit=0
 TOOLS="$_tools" \
 OLLAMA_HOST="http://${_CONTAINER}:11434" \
 OLLAMA_MODEL="$OLLAMA_MODEL" \
-_DOCKER_OPTS_NETWORK="$_NETWORK" \
   "$SCRIPT_DIR/docker-scan.sh" \
   --clearwing-ack-risk \
   "${_pass_args[@]+"${_pass_args[@]}"}" || _scan_exit=$?
@@ -145,9 +147,9 @@ if [[ $_debug -eq 1 ]] || [[ $_scan_exit -ge 2 ]]; then
   echo "  OLLAMA_HOST : http://${_CONTAINER}:11434" >&2
   echo "  NETWORK     : $_NETWORK" >&2
   echo "[clearwing] Ollamaコンテナ状態:" >&2
-  docker inspect "$_CONTAINER" \
+  { docker inspect "$_CONTAINER" \
     --format '  status={{.State.Status}}  ip={{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \
-    2>/dev/null >&2 || echo "  (コンテナが見つかりません)" >&2
+    2>/dev/null || echo "  (コンテナが見つかりません)"; } >&2
   echo "[clearwing] Ollamaコンテナログ (直近20行):" >&2
   docker logs --tail 20 "$_CONTAINER" 2>&1 | sed 's/^/  /' >&2 || true
   echo "[clearwing] =================" >&2
