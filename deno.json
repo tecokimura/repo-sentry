@@ -3,8 +3,8 @@
     "check": "deno check src/cli.ts",
     "fmt": "deno fmt",
     "lint": "deno lint",
-    "test": "deno test --allow-read --allow-write=./reports --allow-env=GITHUB_TOKEN --allow-net=api.github.com --allow-run=gitleaks,trivy",
-    "run": "deno run --allow-read --allow-write=./reports --allow-env=GITHUB_TOKEN --allow-net=api.github.com --allow-run=gitleaks,trivy src/cli.ts"
+    "test": "deno test --allow-read --allow-write=./reports --allow-env=GITHUB_TOKEN --allow-net=api.github.com,host.docker.internal --allow-run=gitleaks,trivy",
+    "run": "deno run --allow-read --allow-write=./reports --allow-env=GITHUB_TOKEN --allow-net=api.github.com,host.docker.internal --allow-run=gitleaks,trivy src/cli.ts"
   },
   "fmt": {
     "lineWidth": 100,
