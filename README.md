@@ -3,12 +3,13 @@
 repo-sentry は、GitHub リポジトリを複数のセキュリティツールでチェックし、結果を JSON / Markdown
 レポートへまとめる Deno + TypeScript 製 CLI です。
 
-現在の MVP では、Docker image 内で次を実行できます。
+Docker image 内で次の collector を実行できます。
 
 - `gitleaks`: シークレット漏洩チェック
 - `trivy`: 依存関係の既知脆弱性と、IaC・設定ファイルの misconfiguration チェック。secret 検出は
   `gitleaks` に委ねるため scanner を `vuln,misconfig` に限定しています
 - `dependabot`: GitHub Dependabot alerts API の取得と有効状態診断
+- `clearwing`: LLM（Ollama）による各 finding のリスク分析・対応判断メモ生成（後述）
 
 ホストに `gitleaks` や `trivy` を直接インストールする必要はありません。基本は Docker で実行します。
 
@@ -64,6 +65,35 @@ reports/YYYY-MM-DD_repo-sentry-docker-scan.md
 reports/2026-06-08_repo-sentry-docker-scan.md
 ```
 
+## 設定ファイル（.env）
+
+シークレットや設定は `.env` ファイルで管理できます。
+
+```bash
+cp .env.example .env
+# エディタで値を設定する
+```
+
+`.env` があればスキャン実行時に自動で読み込まれます。シェル環境変数が同名の変数を持つ場合は、
+シェル変数が優先されます。
+
+**.env の設定項目:**
+
+```bash
+# GitHub Personal Access Token（dependabot使用時に必要）
+GITHUB_TOKEN=ghp_xxxxxxxxxxxx
+
+# Slack通知用 Webhook URL（任意）
+SLACK_WEBHOOK_URL=https://hooks.slack.com/...
+
+# Clearwing で使用する Ollama モデル（clearwing使用時のみ参照）
+OLLAMA_MODEL=llama3.2
+```
+
+`.env` は `.gitignore` に含まれているため、誤ってコミットされることはありません。
+
+---
+
 ## Dependabot も含めて実行する
 
 Dependabot alerts API を使う場合は、GitHub token と repository 名が必要です。
@@ -98,6 +128,80 @@ repo-sentry は、alerts 件数だけでなく、取得元の状態もレポー�
 | `unknown`             | API 応答だけでは確定できない                     |
 
 `0 件` と `権限不足で確認不能` は別物として扱います。
+
+## Clearwing: LLM による finding 分析（オプション）
+
+Clearwing は、スキャン結果の各 finding に対して以下を自動生成します。
+
+- **リスク**: 攻撃シナリオとビジネスへの影響
+- **類似インシデント**: この種の脆弱性に関連する実際の攻撃事例
+- **対応判断メモ**: 影響範囲・対応コスト・放置した場合の最悪シナリオ
+
+通常スキャンとは**完全に独立したスクリプト**で動作します。`docker-scan.sh` は Ollama を一切使いません。
+
+### パターン A: 通常スキャン（LLM なし）
+
+```bash
+./scripts/docker-scan.sh /path/to/target-repo
+```
+
+Ollama は起動しません。シンプルに gitleaks + trivy の結果のみレポートされます。
+
+### パターン B: LLM 分析付きスキャン（Clearwing あり）
+
+```bash
+./scripts/docker-scan-clearwing.sh /path/to/target-repo
+```
+
+実行の流れ:
+
+1. Ollama コンテナを自動起動
+2. モデルが未ダウンロードの場合は取得（初回のみ、約 2 GB）
+3. スキャンを実行し、critical / high の finding に LLM 分析を追加
+4. スキャン完了後に Ollama コンテナを自動停止・削除
+
+> **初回実行について:** `llama3.2` モデル（約 2 GB）のダウンロードが発生します。
+> 2 回目以降は Docker ボリューム `repo-sentry-ollama-models` にキャッシュされるため、
+> すぐに起動します。
+
+モデルは `.env` の `OLLAMA_MODEL` で変更できます（既定値: `llama3.2`）。
+
+### 分析の深さを変える
+
+既定では critical / high の finding のみ分析します（`quick` モード）。
+`--clearwing-depth` で対象範囲を変更できます。
+
+| 値         | 分析対象                          |
+| ---------- | --------------------------------- |
+| `quick`    | critical / high のみ（既定）      |
+| `standard` | critical / high / medium          |
+| `deep`     | info / unknown を除くすべて       |
+
+```bash
+./scripts/docker-scan-clearwing.sh /path/to/target-repo --clearwing-depth=standard
+```
+
+### Clearwing を完全に削除する場合
+
+Ollama の速度が許容できない場合など、完全に取り除く手順:
+
+```bash
+# 1. Clearwing スクリプトを削除
+rm scripts/docker-scan-clearwing.sh
+
+# 2. Ollama の Docker イメージとモデルキャッシュを削除
+docker rmi ollama/ollama
+docker volume rm repo-sentry-ollama-models
+```
+
+`docker-scan.sh` 自体は変更不要で、通常スキャンへの影響はありません。
+
+> **Mac ネイティブ Ollama への移行:** Ollama をホストに直接インストールして
+> `ollama serve` を起動している場合は、`docker-scan.sh` に `--clearwing-ack-risk` と
+> `--tools gitleaks,trivy,clearwing` を追加するだけでそのまま利用できます。
+> ホストの Ollama は `host.docker.internal:11434` で自動的に参照されます。
+
+---
 
 ## Docker 実行オプション
 
@@ -146,14 +250,14 @@ CLI オプションは対応する環境変数より優先されます。環境�
 
 ## Secret / API Key 変数
 
-secret は CLI 引数ではなく環境変数で渡します。repo-sentry は token
-をレポート、ログ、エラー詳細に出さない方針です。
+secret は CLI 引数ではなく環境変数（または `.env` ファイル）で渡します。
+repo-sentry は token をレポート、ログ、エラー詳細に出さない方針です。
 
-| 変数                | 用途                                                           | 必須になる条件        |
-| ------------------- | -------------------------------------------------------------- | --------------------- |
-| `GITHUB_TOKEN`      | GitHub API から repository 情報と Dependabot alerts を取得する | `dependabot` 使用時   |
+| 変数                | 用途                                                           | 必須になる条件      |
+| ------------------- | -------------------------------------------------------------- | ------------------- |
+| `GITHUB_TOKEN`      | GitHub API から repository 情報と Dependabot alerts を取得する | `dependabot` 使用時 |
 | `SLACK_WEBHOOK_URL` | Slack 通知用                                                   | Slack reporter 実装後 |
-| `OPENAI_API_KEY`    | Clearwing が外部 LLM provider を使う場合                       | Clearwing 実装後      |
+| `OLLAMA_MODEL`      | Clearwing で使用する Ollama モデル名（既定値: `llama3.2`）     | `clearwing` 使用時  |
 
 `gitleaks` と `trivy` のみ使用する場合、`GITHUB_TOKEN` は不要です。
 
@@ -326,6 +430,22 @@ TOOLS=gitleaks,trivy ./scripts/docker-scan.sh /path/to/target-repo
 `reports/` ディレクトリへの書き込み権限を確認してください。`DOCKER_USER` の既定値は
 `$(id -u):$(id -g)` のため、通常は問題になりません。
 
+**`docker-scan-clearwing.sh` 実行時に「Ollamaの起動がタイムアウト」と出る**
+
+Docker Hub からの `ollama/ollama` イメージ取得に時間がかかっている可能性があります（初回のみ）。
+ネットワーク環境を確認して再実行してください。
+
+**Clearwing の LLM 分析が遅い**
+
+Mac の Docker は Apple Silicon GPU（Metal）が使えないため、CPU のみで推論します。
+`llama3.2`（3B）であれば通常 30〜80 秒 / finding 程度です。件数が多い場合は
+`--clearwing-depth=quick`（既定）のまま使うか、Mac ネイティブ Ollama への移行を検討してください。
+
+**Clearwing のレポートに「分析なし」の finding がある**
+
+`quick` モード（既定）では critical / high のみ分析します。medium も対象にしたい場合は
+`--clearwing-depth=standard` を指定してください。
+
 ## 現在の実装状態
 
 利用可能:
@@ -335,15 +455,16 @@ TOOLS=gitleaks,trivy ./scripts/docker-scan.sh /path/to/target-repo
 - gitleaks collector
 - Trivy collector
 - Dependabot alerts collector
+- Clearwing collector（Ollama による LLM 分析）
 - JSON reporter
 - Markdown reporter
+- CycloneDX SBOM 生成（`--sbom`）
 - fixture ベースの tests
 
 未実装または後続予定:
 
 - Slack reporter
 - TruffleHog collector
-- Clearwing collector
 - 複数 repository の一括実行
 - GitHub Actions workflow
 
