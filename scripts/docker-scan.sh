@@ -9,7 +9,7 @@ Options:
   --tools LIST          Collectors to run (default: gitleaks,trivy)
                         Example: --tools gitleaks,trivy,dependabot
   --format FORMAT       Output format: markdown or json (default: markdown)
-  --sbom                Generate a CycloneDX SBOM alongside the report
+  --no-sbom             Skip CycloneDX SBOM generation (SBOM is on by default)
   --repo OWNER/NAME     GitHub repository (required for dependabot)
   --report-name NAME    Report filename prefix (default: repo-sentry-docker-scan)
   -h, --help            Show this help
@@ -50,6 +50,8 @@ while [[ $# -gt 0 ]]; do
       FORMAT="${1#*=}"; shift ;;
     --sbom)
       SBOM=true; shift ;;
+    --no-sbom)
+      SBOM=false; shift ;;
     --repo)
       REPO="$2"; shift 2 ;;
     --repo=*)
@@ -82,8 +84,9 @@ if [[ -n "${REPO:-}" ]]; then
   repo_args=(--repo "$REPO")
 fi
 
+SBOM="${SBOM:-true}"
 sbom_args=()
-if [[ -n "${SBOM:-}" ]]; then
+if [[ "$SBOM" == "true" ]]; then
   sbom_args=(--sbom)
 fi
 

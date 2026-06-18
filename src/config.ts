@@ -47,7 +47,7 @@ export function parseRunOptions(args: string[]): CliRunOptions {
     output: flags.output,
     artifactsDir: flags["artifacts-dir"],
     failOnSeverity,
-    sbom: flags["sbom"] === "true",
+    sbom: flags["no-sbom"] !== "true",
     clearwingDepth: parseClearwingDepth(flags["clearwing-depth"]),
     clearwingBudget: parseOptionalNumber(flags["clearwing-budget"], "clearwing-budget"),
     clearwingTimeout: flags["clearwing-timeout"],
