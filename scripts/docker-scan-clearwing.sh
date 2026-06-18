@@ -116,4 +116,20 @@ echo "[clearwing] レポート: ${_report_path}" >&2
 _elapsed=$(( SECONDS - _START_SECONDS ))
 printf "[clearwing] 所要時間: %d分%02d秒\n" "$(( _elapsed / 60 ))" "$(( _elapsed % 60 ))" >&2
 
+# 診断ログ: 失敗時 (exit code >= 2) は自動表示、DEBUG=1 で常時表示
+if [[ "${DEBUG:-}" == "1" ]] || [[ $_scan_exit -ge 2 ]]; then
+  echo "" >&2
+  echo "[clearwing] === 診断ログ ===" >&2
+  echo "[clearwing] Ollama コンテナログ (直近30行):" >&2
+  docker logs --tail 30 "$_CONTAINER" 2>&1 | sed 's/^/  /' >&2 || true
+  echo "" >&2
+  echo "[clearwing] ネットワーク内のコンテナ:" >&2
+  docker network inspect "$_NETWORK" \
+    --format '{{range .Containers}}  {{.Name}}: {{.IPv4Address}}{{"\n"}}{{end}}' \
+    2>/dev/null >&2 || true
+  echo "[clearwing] =================" >&2
+  echo "[clearwing] ヒント: レポートの「Collector 実行結果」にエラー詳細が記載されています。" >&2
+  echo "[clearwing]         次回から常に表示するには: DEBUG=1 ./scripts/docker-scan-clearwing.sh ..." >&2
+fi
+
 exit $_scan_exit
