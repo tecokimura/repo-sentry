@@ -7,6 +7,7 @@
 # 使い方:
 #   ./scripts/docker-scan-clearwing.sh [TARGET_DIR] [OPTIONS]
 #   OPTIONS は docker-scan.sh と同様（--tools, --format, --repo 等）
+#   --debug を付けると診断ログを常時表示する
 #
 # Ollamaを完全に削除する場合（速度が問題な場合など）:
 #   1. このスクリプトを削除
@@ -19,6 +20,17 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 _START_SECONDS=$SECONDS
+
+# --debug フラグをここで処理し、docker-scan.sh には渡さない
+_debug=0
+_pass_args=()
+for _arg in "$@"; do
+  if [[ "$_arg" == "--debug" ]]; then
+    _debug=1
+  else
+    _pass_args+=("$_arg")
+  fi
+done
 
 # .envからOLLAMA_MODELを読む（シェル変数が未設定の場合）
 _ENV_FILE="${ENV_FILE:-${SCRIPT_DIR}/../.env}"
@@ -91,6 +103,15 @@ case "$_format" in
 esac
 _report_path="${_report_dir}/${_report_date}_${_report_name}.${_ext}"
 
+if [[ $_debug -eq 1 ]]; then
+  echo "[clearwing] [debug] OLLAMA_HOST : http://${_CONTAINER}:11434" >&2
+  echo "[clearwing] [debug] NETWORK     : $_NETWORK" >&2
+  echo "[clearwing] [debug] Ollamaコンテナのネットワーク情報:" >&2
+  docker inspect "$_CONTAINER" \
+    --format '  name={{.Name}} status={{.State.Status}} ip={{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \
+    2>/dev/null >&2 || echo "  (コンテナ情報取得失敗)" >&2
+fi
+
 # docker-scan.sh を呼び出す（終了コードを保存）
 # _DOCKER_OPTS_NETWORK: repo-sentryコンテナをOllamaと同じネットワークに接続させる内部フック
 # OLLAMA_HOST: コンテナ名でOllamaを参照（Dockerネットワーク内のDNS解決）
@@ -101,7 +122,7 @@ OLLAMA_MODEL="$OLLAMA_MODEL" \
 _DOCKER_OPTS_NETWORK="$_NETWORK" \
   "$SCRIPT_DIR/docker-scan.sh" \
   --clearwing-ack-risk \
-  "$@" || _scan_exit=$?
+  "${_pass_args[@]+"${_pass_args[@]}"}" || _scan_exit=$?
 
 # スキャン結果を表示
 echo "" >&2
@@ -116,20 +137,22 @@ echo "[clearwing] レポート: ${_report_path}" >&2
 _elapsed=$(( SECONDS - _START_SECONDS ))
 printf "[clearwing] 所要時間: %d分%02d秒\n" "$(( _elapsed / 60 ))" "$(( _elapsed % 60 ))" >&2
 
-# 診断ログ: 失敗時 (exit code >= 2) は自動表示、DEBUG=1 で常時表示
-if [[ "${DEBUG:-}" == "1" ]] || [[ $_scan_exit -ge 2 ]]; then
+# 診断ログ: 失敗時 (exit code >= 2) は自動表示、--debug で常時表示
+if [[ $_debug -eq 1 ]] || [[ $_scan_exit -ge 2 ]]; then
   echo "" >&2
   echo "[clearwing] === 診断ログ ===" >&2
-  echo "[clearwing] Ollama コンテナログ (直近30行):" >&2
-  docker logs --tail 30 "$_CONTAINER" 2>&1 | sed 's/^/  /' >&2 || true
-  echo "" >&2
-  echo "[clearwing] ネットワーク内のコンテナ:" >&2
-  docker network inspect "$_NETWORK" \
-    --format '{{range .Containers}}  {{.Name}}: {{.IPv4Address}}{{"\n"}}{{end}}' \
-    2>/dev/null >&2 || true
+  echo "[clearwing] 接続設定:" >&2
+  echo "  OLLAMA_HOST : http://${_CONTAINER}:11434" >&2
+  echo "  NETWORK     : $_NETWORK" >&2
+  echo "[clearwing] Ollamaコンテナ状態:" >&2
+  docker inspect "$_CONTAINER" \
+    --format '  status={{.State.Status}}  ip={{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \
+    2>/dev/null >&2 || echo "  (コンテナが見つかりません)" >&2
+  echo "[clearwing] Ollamaコンテナログ (直近20行):" >&2
+  docker logs --tail 20 "$_CONTAINER" 2>&1 | sed 's/^/  /' >&2 || true
   echo "[clearwing] =================" >&2
   echo "[clearwing] ヒント: レポートの「Collector 実行結果」にエラー詳細が記載されています。" >&2
-  echo "[clearwing]         次回から常に表示するには: DEBUG=1 ./scripts/docker-scan-clearwing.sh ..." >&2
+  [[ $_scan_exit -ge 2 ]] && echo "[clearwing]         詳細確認には --debug オプションを追加してください。" >&2
 fi
 
 exit $_scan_exit
