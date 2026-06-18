@@ -168,17 +168,18 @@ Ollama は起動しません。シンプルに gitleaks + trivy の結果のみ�
 
 ### 分析の深さを変える
 
-既定では critical / high の finding のみ分析します（`quick` モード）。
-`--clearwing-depth` で対象範囲を変更できます。
+既定では critical / high / medium の finding を分析します（`standard` モード）。
+finding が多すぎる場合は `--clearwing-depth=quick` で絞れます。
 
 | 値         | 分析対象                          |
 | ---------- | --------------------------------- |
-| `quick`    | critical / high のみ（既定）      |
-| `standard` | critical / high / medium          |
+| `quick`    | critical / high のみ              |
+| `standard` | critical / high / medium（既定）  |
 | `deep`     | info / unknown を除くすべて       |
 
 ```bash
-./scripts/docker-scan-clearwing.sh /path/to/target-repo --clearwing-depth=standard
+# mediumが多くて時間がかかる場合はquickに絞る
+./scripts/docker-scan-clearwing.sh /path/to/target-repo --clearwing-depth=quick
 ```
 
 ### Clearwing を完全に削除する場合
@@ -441,10 +442,10 @@ Mac の Docker は Apple Silicon GPU（Metal）が使えないため、CPU の�
 `llama3.2`（3B）であれば通常 30〜80 秒 / finding 程度です。件数が多い場合は
 `--clearwing-depth=quick`（既定）のまま使うか、Mac ネイティブ Ollama への移行を検討してください。
 
-**Clearwing のレポートに「分析なし」の finding がある**
+**Clearwing の分析に時間がかかりすぎる**
 
-`quick` モード（既定）では critical / high のみ分析します。medium も対象にしたい場合は
-`--clearwing-depth=standard` を指定してください。
+`standard` モード（既定）では critical / high / medium を分析します。medium の件数が多い場合は
+`--clearwing-depth=quick` で critical / high のみに絞れます。
 
 ## 現在の実装状態
 

@@ -18,7 +18,7 @@ export async function enrichWithClearwing(
 
   const host = request.clearwing?.ollamaHost ?? DEFAULT_OLLAMA_HOST;
   const model = request.clearwing?.ollamaModel ?? DEFAULT_MODEL;
-  const depth = request.clearwing?.depth ?? "quick";
+  const depth = request.clearwing?.depth ?? "standard";
   const targets = filterByDepth(findings, depth);
 
   if (targets.length === 0) {
