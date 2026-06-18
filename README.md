@@ -56,13 +56,13 @@ echo "exit: $?"
 3. レポートを確認します。
 
 ```text
-reports/YYYY-MM-DD_repo-sentry-docker-scan.md
+reports/YYMMDDHHMM_repo-sentry-docker-scan.md
 ```
 
 例:
 
 ```text
-reports/2026-06-08_repo-sentry-docker-scan.md
+reports/2606181423_repo-sentry-docker-scan.md
 ```
 
 ## 設定ファイル（.env）
@@ -110,7 +110,7 @@ REPORT_NAME=owner-name-security-scan \
 出力例:
 
 ```text
-reports/YYYY-MM-DD_owner-name-security-scan.md
+reports/YYMMDDHHMM_owner-name-security-scan.md
 ```
 
 Dependabot alerts API は、API 実行時に GitHub に新規スキャンをさせるものではありません。GitHub 側で

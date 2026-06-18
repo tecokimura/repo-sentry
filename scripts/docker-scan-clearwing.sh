@@ -81,7 +81,7 @@ fi
 
 # レポートパスを事前に確定して表示
 _report_dir="$(cd "${REPORTS_DIR:-$PWD/reports}" 2>/dev/null && pwd -P || echo "$PWD/reports")"
-_report_date="${REPORT_DATE:-$(date +%F)}"
+_report_date="${REPORT_DATE:-$(date +%y%m%d%H%M)}"
 _report_name="${REPORT_NAME:-repo-sentry-docker-scan}"
 _format="${FORMAT:-markdown}"
 case "$_format" in
