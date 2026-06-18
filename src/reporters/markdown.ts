@@ -130,6 +130,7 @@ function renderCollectorStatusTable(statuses: CollectorStatus[]): string {
 
 function renderFinding(finding: Finding): string {
   const lines: string[] = [];
+  const bestFix = selectBestFixVersion(finding.packageVersion, finding.fixedVersion);
 
   lines.push(`### [${finding.severity.toUpperCase()}] ${escapeMarkdown(finding.title)}`);
   lines.push("");
@@ -145,7 +146,7 @@ function renderFinding(finding: Finding): string {
 
   const tableRows: [string, string][] = [];
   if (finding.packageVersion) tableRows.push(["現在バージョン", finding.packageVersion]);
-  if (finding.fixedVersion) tableRows.push(["推奨対応バージョン", `${finding.fixedVersion} 以上`]);
+  if (bestFix) tableRows.push(["推奨対応バージョン", `${bestFix} 以上`]);
   if (finding.url) tableRows.push(["参考", finding.url]);
 
   if (tableRows.length > 0) {
@@ -157,7 +158,7 @@ function renderFinding(finding: Finding): string {
     lines.push("");
   }
 
-  const remedy = remedyCommand(finding);
+  const remedy = remedyCommand(finding, bestFix);
   if (remedy) {
     lines.push(`**対応コマンド** \`${remedy}\``);
     lines.push("");
@@ -171,9 +172,9 @@ function displayPackageName(packageName: string): string {
   return colonIdx >= 0 ? packageName.slice(colonIdx + 1) : packageName;
 }
 
-function remedyCommand(finding: Finding): string | undefined {
-  const { packageName, fixedVersion, location } = finding;
-  if (!packageName || !fixedVersion) return undefined;
+function remedyCommand(finding: Finding, targetVersion: string | undefined): string | undefined {
+  const { packageName, location } = finding;
+  if (!packageName || !targetVersion) return undefined;
 
   const loc = (location ?? "").toLowerCase();
   const colonIdx = packageName.indexOf(":");
@@ -183,16 +184,16 @@ function remedyCommand(finding: Finding): string | undefined {
   switch (eco) {
     case "composer":
     case "packagist":
-      return `composer require "${pkg}:^${fixedVersion}"`;
+      return `composer require "${pkg}:^${targetVersion}"`;
     case "npm":
     case "yarn":
-      return `npm install "${pkg}@^${fixedVersion}"`;
+      return `npm install "${pkg}@^${targetVersion}"`;
     case "pip":
     case "pypi":
-      return `pip install "${pkg}>=${fixedVersion}"`;
+      return `pip install "${pkg}>=${targetVersion}"`;
     case "go":
     case "golang":
-      return `go get "${pkg}@v${fixedVersion}"`;
+      return `go get "${pkg}@v${targetVersion}"`;
     case "gem":
     case "rubygems":
       return `bundle update ${pkg}`;
@@ -201,6 +202,36 @@ function remedyCommand(finding: Finding): string | undefined {
     default:
       return undefined;
   }
+}
+
+function selectBestFixVersion(
+  currentVersion?: string,
+  fixedVersion?: string,
+): string | undefined {
+  if (!fixedVersion) return undefined;
+
+  const all = fixedVersion.split(",").map((v) => v.trim()).filter(Boolean);
+  if (all.length === 0) return undefined;
+  if (all.length === 1) return all[0];
+  if (!currentVersion) return all.sort(compareSemver)[0];
+
+  // インストール済みバージョン以上で最小のものを選択
+  const eligible = all.filter((v) => compareSemver(v, currentVersion) >= 0);
+  if (eligible.length > 0) return eligible.sort(compareSemver)[0];
+
+  // 全修正バージョンが現在より古い場合（Trivyデータが古い等）は最新を返す
+  return all.sort(compareSemver).at(-1);
+}
+
+function compareSemver(a: string, b: string): number {
+  const norm = (v: string) => v.replace(/^[vV]/, "").split(".").map((s) => parseInt(s, 10) || 0);
+  const pa = norm(a);
+  const pb = norm(b);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
 }
 
 function detectEcosystem(loc: string): string {
