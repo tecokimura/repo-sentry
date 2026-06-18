@@ -15,7 +15,7 @@
 #   3. docker rmi ollama/ollama
 #   4. docker volume rm repo-sentry-ollama-models
 
-set -euo pipefail
+set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 
@@ -36,9 +36,9 @@ _NETWORK="repo-sentry-net-${_RUN_ID}"
 
 cleanup() {
   echo "[clearwing] Ollamaコンテナを停止中..." >&2
-  docker stop "$_CONTAINER" 2>/dev/null || true
-  docker rm   "$_CONTAINER" 2>/dev/null || true
-  docker network rm "$_NETWORK" 2>/dev/null || true
+  docker stop "$_CONTAINER" >/dev/null 2>&1 || true
+  docker rm   "$_CONTAINER" >/dev/null 2>&1 || true
+  docker network rm "$_NETWORK" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT INT TERM
 
@@ -78,13 +78,38 @@ if [[ "$_tools" != *"clearwing"* ]]; then
   _tools="${_tools},clearwing"
 fi
 
-# docker-scan.sh を呼び出す
+# レポートパスを事前に確定して表示
+_report_dir="$(cd "${REPORTS_DIR:-$PWD/reports}" 2>/dev/null && pwd -P || echo "$PWD/reports")"
+_report_date="${REPORT_DATE:-$(date +%F)}"
+_report_name="${REPORT_NAME:-repo-sentry-docker-scan}"
+_format="${FORMAT:-markdown}"
+case "$_format" in
+  json) _ext="json" ;;
+  *)    _ext="md"   ;;
+esac
+_report_path="${_report_dir}/${_report_date}_${_report_name}.${_ext}"
+
+# docker-scan.sh を呼び出す（終了コードを保存）
 # _DOCKER_OPTS_NETWORK: repo-sentryコンテナをOllamaと同じネットワークに接続させる内部フック
 # OLLAMA_HOST: コンテナ名でOllamaを参照（Dockerネットワーク内のDNS解決）
+_scan_exit=0
 TOOLS="$_tools" \
 OLLAMA_HOST="http://${_CONTAINER}:11434" \
 OLLAMA_MODEL="$OLLAMA_MODEL" \
 _DOCKER_OPTS_NETWORK="$_NETWORK" \
   "$SCRIPT_DIR/docker-scan.sh" \
   --clearwing-ack-risk \
-  "$@"
+  "$@" || _scan_exit=$?
+
+# スキャン結果を表示
+echo "" >&2
+case $_scan_exit in
+  0) echo "[clearwing] 完了: 対応が必要な finding はありませんでした。" >&2 ;;
+  1) echo "[clearwing] 完了: 対応が必要な finding が検出されました。" >&2 ;;
+  3) echo "[clearwing] 警告: 一部の collector でエラーが発生しました。" >&2 ;;
+  4) echo "[clearwing] 警告: 権限不足または token が不足しています。" >&2 ;;
+  *) echo "[clearwing] スキャンが終了コード ${_scan_exit} で終了しました。" >&2 ;;
+esac
+echo "[clearwing] レポート: ${_report_path}" >&2
+
+exit $_scan_exit
