@@ -45,10 +45,10 @@ Deno.test("parseRunOptions requires explicit Clearwing risk acknowledgement", ()
     "--tools",
     "clearwing",
     "--clearwing-depth",
-    "quick",
+    "priority",
     "--clearwing-ack-risk",
   ]);
 
   assertEquals(options.clearwingAckRisk, true);
-  assertEquals(options.clearwingDepth, "quick");
+  assertEquals(options.clearwingDepth, "priority");
 });

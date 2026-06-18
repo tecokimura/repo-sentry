@@ -103,7 +103,7 @@ export interface ScanRequest {
   githubToken?: string;
   sbom?: boolean;
   clearwing?: {
-    depth?: "quick" | "standard" | "deep";
+    depth?: "priority" | "standard" | "verbose";
     budget?: number;
     timeout?: string;
     ackRisk: boolean;

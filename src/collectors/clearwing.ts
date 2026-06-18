@@ -18,7 +18,7 @@ export async function enrichWithClearwing(
 
   const host = request.clearwing?.ollamaHost ?? DEFAULT_OLLAMA_HOST;
   const model = request.clearwing?.ollamaModel ?? DEFAULT_MODEL;
-  const depth = request.clearwing?.depth ?? "standard";
+  const depth = request.clearwing?.depth ?? "standard";  // priority / standard / verbose
   const targets = filterByDepth(findings, depth);
 
   if (targets.length === 0) {
@@ -67,15 +67,15 @@ export async function enrichWithClearwing(
   return { status, enriched: enrichedFindings };
 }
 
-function filterByDepth(findings: Finding[], depth: "quick" | "standard" | "deep"): Finding[] {
+function filterByDepth(findings: Finding[], depth: "priority" | "standard" | "verbose"): Finding[] {
   return findings.filter((f) => {
     if (f.category === "scanner-diagnostic") return false;
     switch (depth) {
-      case "quick":
+      case "priority":
         return f.severity === "critical" || f.severity === "high";
       case "standard":
         return f.severity === "critical" || f.severity === "high" || f.severity === "medium";
-      case "deep":
+      case "verbose":
         return f.severity !== "info" && f.severity !== "unknown";
     }
   });

@@ -11,7 +11,7 @@ export interface CliRunOptions {
   artifactsDir?: string;
   failOnSeverity: Severity;
   sbom: boolean;
-  clearwingDepth?: "quick" | "standard" | "deep";
+  clearwingDepth?: "priority" | "standard" | "verbose";
   clearwingBudget?: number;
   clearwingTimeout?: string;
   clearwingAckRisk: boolean;
@@ -146,9 +146,9 @@ function parseSeverity(value: string): Severity {
   throw new Error(`Unsupported severity threshold: ${value}`);
 }
 
-function parseClearwingDepth(value?: string): "quick" | "standard" | "deep" | undefined {
+function parseClearwingDepth(value?: string): "priority" | "standard" | "verbose" | undefined {
   if (value === undefined) return undefined;
-  if (value === "quick" || value === "standard" || value === "deep") return value;
+  if (value === "priority" || value === "standard" || value === "verbose") return value;
   throw new Error(`Unsupported clearwing depth: ${value}`);
 }
 
@@ -178,8 +178,8 @@ function validateOptions(options: CliRunOptions): void {
     if (!options.clearwingAckRisk) {
       throw new Error("--clearwing-ack-risk is required when using clearwing");
     }
-    if (options.clearwingDepth === "deep") {
-      throw new Error("Clearwing depth 'deep' is not allowed in the default CLI flow");
+    if (options.clearwingDepth === "verbose") {
+      throw new Error("Clearwing depth 'verbose' is not allowed in the default CLI flow");
     }
   }
 }

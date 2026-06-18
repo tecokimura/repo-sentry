@@ -169,17 +169,31 @@ Ollama は起動しません。シンプルに gitleaks + trivy の結果のみ�
 ### 分析の深さを変える
 
 既定では critical / high / medium の finding を分析します（`standard` モード）。
-finding が多すぎる場合は `--clearwing-depth=quick` で絞れます。
+finding が多すぎる場合は `--clearwing-depth=priority` で絞れます。
 
-| 値         | 分析対象                          |
-| ---------- | --------------------------------- |
-| `quick`    | critical / high のみ              |
-| `standard` | critical / high / medium（既定）  |
-| `deep`     | info / unknown を除くすべて       |
+| 値           | 分析対象                          |
+| ------------ | --------------------------------- |
+| `priority`   | critical / high のみ              |
+| `standard`   | critical / high / medium（既定）  |
+| `verbose`    | info / unknown を除くすべて       |
 
 ```bash
-# mediumが多くて時間がかかる場合はquickに絞る
-./scripts/docker-scan-clearwing.sh /path/to/target-repo --clearwing-depth=quick
+# 標準（デフォルト）: critical / high / medium を分析
+./scripts/docker-scan-clearwing.sh /path/to/target-repo
+
+# mediumが多くて時間がかかる場合: critical / high のみに絞る
+./scripts/docker-scan-clearwing.sh /path/to/target-repo --clearwing-depth=priority
+
+# すべての finding を分析したい場合
+./scripts/docker-scan-clearwing.sh /path/to/target-repo --clearwing-depth=verbose
+
+# dependabot も含めてスキャン + LLM 分析
+./scripts/docker-scan-clearwing.sh /path/to/target-repo \
+  --repo owner/name \
+  --tools gitleaks,trivy,dependabot,clearwing
+
+# JSON 形式で出力
+./scripts/docker-scan-clearwing.sh /path/to/target-repo --format json
 ```
 
 ### Clearwing を完全に削除する場合
@@ -445,7 +459,7 @@ Mac の Docker は Apple Silicon GPU（Metal）が使えないため、CPU の�
 **Clearwing の分析に時間がかかりすぎる**
 
 `standard` モード（既定）では critical / high / medium を分析します。medium の件数が多い場合は
-`--clearwing-depth=quick` で critical / high のみに絞れます。
+`--clearwing-depth=priority` で critical / high のみに絞れます。
 
 ## 現在の実装状態
 
