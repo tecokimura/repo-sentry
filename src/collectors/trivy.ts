@@ -147,9 +147,10 @@ async function annotateSbom(sbomPath: string, scanTarget: string): Promise<void>
 
     const componentCount = Array.isArray(sbom.components) ? sbom.components.length : 0;
     props.push({ name: "repo-sentry:scan:componentCount", value: String(componentCount) });
-    if (componentCount === 0) {
-      props.push({ name: "repo-sentry:scan:status", value: "no_components_found" });
-    }
+    props.push({
+      name: "repo-sentry:scan:status",
+      value: componentCount === 0 ? "no_components_found" : "completed",
+    });
 
     metadata.properties = [...existing, ...props];
     sbom.metadata = metadata;
