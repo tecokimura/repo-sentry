@@ -43,12 +43,17 @@ export async function enrichWithClearwing(
   const enrichedFindings: Finding[] = [];
   let enrichedCount = 0;
   let failedCount = 0;
+  const total = targets.length;
 
   for (const finding of findings) {
     if (!targetSet.has(finding)) {
       enrichedFindings.push(finding);
       continue;
     }
+
+    const current = enrichedCount + failedCount + 1;
+    const label = finding.id ?? finding.title.slice(0, 50);
+    console.error(`[clearwing] 分析中 (${current}/${total}): ${label} [${finding.severity.toUpperCase()}]`);
 
     try {
       const sections = await analyzeOnce(host, model, finding);
