@@ -11,10 +11,9 @@
 #
 # Ollamaを完全に削除する場合（速度が問題な場合など）:
 #   1. このスクリプトを削除
-#   2. scripts/docker-scan.sh の「Clearwing連携用の内部フック」コメント部分（4行）と
-#      docker run 内の _network_args 展開を削除
-#   3. docker rmi ollama/ollama
-#   4. docker volume rm repo-sentry-ollama-models
+#   2. docker rmi ollama/ollama
+#   3. docker volume rm repo-sentry-ollama-models
+#   ※ docker-scan.sh の変更は不要
 
 set -uo pipefail
 
@@ -42,29 +41,29 @@ OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.2}"
 OLLAMA_IMAGE="${OLLAMA_IMAGE:-ollama/ollama}"
 OLLAMA_VOLUME="repo-sentry-ollama-models"
 
-# PIDベースのユニーク名（並列実行対応）
+# PIDベースのユニーク名
 _RUN_ID="$$"
 _CONTAINER="repo-sentry-ollama-${_RUN_ID}"
-_NETWORK="repo-sentry-net-${_RUN_ID}"
 
 cleanup() {
   echo "[clearwing] Ollamaコンテナを停止中..." >&2
   docker stop "$_CONTAINER" >/dev/null 2>&1 || true
   docker rm   "$_CONTAINER" >/dev/null 2>&1 || true
-  docker network rm "$_NETWORK" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT INT TERM
 
-echo "[clearwing] Dockerネットワークを作成中..." >&2
-docker network create "$_NETWORK" >/dev/null
-
 echo "[clearwing] Ollamaコンテナを起動中 (model: ${OLLAMA_MODEL})..." >&2
+# -p 11434:11434 でポートをホストに公開 → repo-sentry は host.docker.internal:11434 で接続
 docker run -d \
   --name "$_CONTAINER" \
-  --network "$_NETWORK" \
+  -p 11434:11434 \
   -e OLLAMA_HOST=0.0.0.0 \
   -v "${OLLAMA_VOLUME}:/root/.ollama" \
-  "$OLLAMA_IMAGE" >/dev/null
+  "$OLLAMA_IMAGE" >/dev/null || {
+  echo "[clearwing] エラー: Ollamaコンテナの起動に失敗しました。" >&2
+  echo "[clearwing] ポート 11434 が既に使用中の場合は他の Ollama プロセスを停止してください。" >&2
+  exit 1
+}
 
 # Ollama API 起動待機（最大30秒）
 echo "[clearwing] Ollama API の起動を待機中..." >&2
@@ -104,23 +103,19 @@ esac
 _report_path="${_report_dir}/${_report_date}_${_report_name}.${_ext}"
 
 if [[ $_debug -eq 1 ]]; then
-  echo "[clearwing] [debug] OLLAMA_HOST : http://${_CONTAINER}:11434" >&2
-  echo "[clearwing] [debug] NETWORK     : $_NETWORK" >&2
-  echo "[clearwing] [debug] Ollamaコンテナのネットワーク情報:" >&2
+  echo "[clearwing] [debug] OLLAMA_HOST : http://host.docker.internal:11434 (デフォルト)" >&2
+  echo "[clearwing] [debug] Ollamaコンテナの状態:" >&2
   { docker inspect "$_CONTAINER" \
-    --format '  name={{.Name}} status={{.State.Status}} ip={{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \
+    --format '  name={{.Name}} status={{.State.Status}} ports={{json .NetworkSettings.Ports}}' \
     2>/dev/null || echo "  (コンテナ情報取得失敗)"; } >&2
 fi
 
 # docker-scan.sh を呼び出す（終了コードを保存）
-# --docker-network: repo-sentryコンテナをOllamaと同じネットワークに接続させる
-# OLLAMA_HOST: コンテナ名でOllamaを参照（Dockerネットワーク内のDNS解決）
+# OLLAMA_HOST は clearwing.ts のデフォルト値 host.docker.internal:11434 を使用
 _scan_exit=0
 TOOLS="$_tools" \
-OLLAMA_HOST="http://${_CONTAINER}:11434" \
 OLLAMA_MODEL="$OLLAMA_MODEL" \
   "$SCRIPT_DIR/docker-scan.sh" \
-  --docker-network "$_NETWORK" \
   --clearwing-ack-risk \
   "${_pass_args[@]+"${_pass_args[@]}"}" || _scan_exit=$?
 
@@ -142,11 +137,10 @@ if [[ $_debug -eq 1 ]] || [[ $_scan_exit -ge 2 ]]; then
   echo "" >&2
   echo "[clearwing] === 診断ログ ===" >&2
   echo "[clearwing] 接続設定:" >&2
-  echo "  OLLAMA_HOST : http://${_CONTAINER}:11434" >&2
-  echo "  NETWORK     : $_NETWORK" >&2
+  echo "  OLLAMA_HOST : http://host.docker.internal:11434" >&2
   echo "[clearwing] Ollamaコンテナ状態:" >&2
   { docker inspect "$_CONTAINER" \
-    --format '  status={{.State.Status}}  ip={{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \
+    --format '  status={{.State.Status}}  ports={{json .NetworkSettings.Ports}}' \
     2>/dev/null || echo "  (コンテナが見つかりません)"; } >&2
   echo "[clearwing] Ollamaコンテナログ (直近20行):" >&2
   docker logs --tail 20 "$_CONTAINER" 2>&1 | sed 's/^/  /' >&2 || true
