@@ -130,13 +130,20 @@ function renderCollectorStatusTable(statuses: CollectorStatus[]): string {
 
 function renderFinding(finding: Finding): string {
   const lines: string[] = [];
-  const bestFix = selectBestFixVersion(finding.packageVersion, finding.fixedVersion);
+  const { best: bestFix, others: altFixes } = resolveFixVersions(
+    finding.packageVersion,
+    finding.fixedVersion,
+  );
 
   lines.push(`### [${finding.severity.toUpperCase()}] ${escapeMarkdown(finding.title)}`);
   lines.push("");
 
   const subtitleParts: string[] = [];
-  if (finding.id) subtitleParts.push(`**${finding.id}**`);
+  if (finding.id) {
+    subtitleParts.push(
+      finding.url ? `[**${finding.id}**](${finding.url})` : `**${finding.id}**`,
+    );
+  }
   if (finding.packageName) subtitleParts.push(displayPackageName(finding.packageName));
   if (finding.location) subtitleParts.push(escapeMarkdown(finding.location));
   if (subtitleParts.length > 0) {
@@ -147,6 +154,9 @@ function renderFinding(finding: Finding): string {
   const tableRows: [string, string][] = [];
   if (finding.packageVersion) tableRows.push(["現在バージョン", finding.packageVersion]);
   if (bestFix) tableRows.push(["推奨対応バージョン", `${bestFix} 以上`]);
+  if (altFixes.length > 0) {
+    tableRows.push(["他の修正バージョン", altFixes.map((v) => `${v} 以上`).join("、")]);
+  }
   if (finding.url) tableRows.push(["参考", finding.url]);
 
   if (tableRows.length > 0) {
@@ -204,23 +214,46 @@ function remedyCommand(finding: Finding, targetVersion: string | undefined): str
   }
 }
 
-function selectBestFixVersion(
+function resolveFixVersions(
   currentVersion?: string,
   fixedVersion?: string,
-): string | undefined {
-  if (!fixedVersion) return undefined;
+): { best: string | undefined; others: string[] } {
+  if (!fixedVersion) return { best: undefined, others: [] };
 
   const all = fixedVersion.split(",").map((v) => v.trim()).filter(Boolean);
-  if (all.length === 0) return undefined;
-  if (all.length === 1) return all[0];
-  if (!currentVersion) return all.sort(compareSemver)[0];
+  if (all.length === 0) return { best: undefined, others: [] };
+  if (!currentVersion || all.length === 1) {
+    return { best: all.sort(compareSemver)[0], others: [] };
+  }
 
   // インストール済みバージョン以上で最小のものを選択
-  const eligible = all.filter((v) => compareSemver(v, currentVersion) >= 0);
-  if (eligible.length > 0) return eligible.sort(compareSemver)[0];
+  const eligible = all.filter((v) => compareSemver(v, currentVersion) >= 0).sort(compareSemver);
+  if (eligible.length === 0) {
+    return { best: all.sort(compareSemver).at(-1), others: [] };
+  }
 
-  // 全修正バージョンが現在より古い場合（Trivyデータが古い等）は最新を返す
-  return all.sort(compareSemver).at(-1);
+  const best = eligible[0];
+  const currentMajor = semverMajor(currentVersion);
+  const bestMajor = semverMajor(best);
+
+  // 同一メジャー内で修正できる場合は代替不要
+  if (bestMajor === currentMajor) return { best, others: [] };
+
+  // メジャーアップグレードが必要な場合、他のメジャーラインの最小修正バージョンを列挙
+  const byMajor = new Map<number, string>();
+  for (const v of eligible) {
+    const major = semverMajor(v);
+    if (major !== bestMajor && !byMajor.has(major)) byMajor.set(major, v);
+  }
+  const others = Array.from(byMajor.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([, v]) => v);
+
+  return { best, others };
+}
+
+function semverMajor(v: string): number {
+  return parseInt(v.replace(/^[vV]/, "").split(".")[0] ?? "0", 10) || 0;
 }
 
 function compareSemver(a: string, b: string): number {
