@@ -15,6 +15,8 @@ export interface CliRunOptions {
   clearwingBudget?: number;
   clearwingTimeout?: string;
   clearwingAckRisk: boolean;
+  ollamaHost?: string;
+  ollamaModel?: string;
 }
 
 const supportedTools: ToolName[] = [
@@ -50,6 +52,8 @@ export function parseRunOptions(args: string[]): CliRunOptions {
     clearwingBudget: parseOptionalNumber(flags["clearwing-budget"], "clearwing-budget"),
     clearwingTimeout: flags["clearwing-timeout"],
     clearwingAckRisk: flags["clearwing-ack-risk"] === "true",
+    ollamaHost: flags["ollama-host"],
+    ollamaModel: flags["ollama-model"],
   };
 }
 
@@ -71,6 +75,8 @@ export function toScanRequest(options: CliRunOptions): ScanRequest {
       budget: options.clearwingBudget,
       timeout: options.clearwingTimeout,
       ackRisk: options.clearwingAckRisk,
+      ollamaHost: options.ollamaHost ?? readEnv("OLLAMA_HOST"),
+      ollamaModel: options.ollamaModel ?? readEnv("OLLAMA_MODEL"),
     },
   };
 }

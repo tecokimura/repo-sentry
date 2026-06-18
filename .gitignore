@@ -1,3 +1,4 @@
 reports/
 .repo-sentry/
 *.log
+.env

@@ -93,12 +93,29 @@ TARGET_PATH="$(cd "$TARGET_PATH" && pwd -P)"
 REPORTS_DIR="$(cd "$REPORTS_DIR" && pwd -P)"
 CACHE_DIR="$(cd "$CACHE_DIR" && pwd -P)"
 
+# .envファイルがあればコンテナに渡す（シェル変数が優先される）
+_env_file_args=()
+if [[ -f "${ENV_FILE:-.env}" ]]; then
+  _env_file_args=(--env-file "${ENV_FILE:-.env}")
+fi
+
+# Clearwing連携用の内部フック: docker-scan-clearwing.sh がOllamaネットワークを注入するために使用
+# このフックを削除したい場合は以下4行と docker run の _network_args 展開を削除する
+_network_args=()
+if [[ -n "${_DOCKER_OPTS_NETWORK:-}" ]]; then
+  _network_args=(--network "$_DOCKER_OPTS_NETWORK")
+fi
+
 docker run --rm \
   --user "$DOCKER_USER" \
+  "${_env_file_args[@]+"${_env_file_args[@]}"}" \
+  "${_network_args[@]+"${_network_args[@]}"}" \
   -e DENO_DIR=/workspace/.repo-sentry/deno-cache \
   -e GITHUB_TOKEN \
   -e SLACK_WEBHOOK_URL \
   -e OPENAI_API_KEY \
+  -e OLLAMA_HOST \
+  -e OLLAMA_MODEL \
   -v "$TARGET_PATH:/workspace/target:ro" \
   -v "$REPORTS_DIR:/workspace/reports" \
   -v "$CACHE_DIR:/workspace/.repo-sentry" \

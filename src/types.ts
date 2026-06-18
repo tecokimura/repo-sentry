@@ -52,6 +52,9 @@ export interface Finding {
   packageName?: string;
   packageVersion?: string;
   fixedVersion?: string;
+  clearwingRisk?: string;
+  clearwingIncidents?: string;
+  clearwingMemo?: string;
   confidence?: Confidence;
   evidenceLevel?: EvidenceLevel;
   rawReportPath?: string;
@@ -104,6 +107,8 @@ export interface ScanRequest {
     budget?: number;
     timeout?: string;
     ackRisk: boolean;
+    ollamaHost?: string;
+    ollamaModel?: string;
   };
 }
 

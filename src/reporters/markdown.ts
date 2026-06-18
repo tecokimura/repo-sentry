@@ -8,7 +8,8 @@ export function renderMarkdownReport(report: ScanReport): string {
 
   lines.push(`# ${reportTitle(report)}`);
   lines.push("");
-  lines.push(`Scan date: ${scanDate}　Clearwing: なし`);
+  const hasClearwing = report.findings.some((f) => f.clearwingRisk);
+  lines.push(`Scan date: ${scanDate}　Clearwing: ${hasClearwing ? "あり" : "なし"}`);
   lines.push("");
 
   lines.push("## 対応優先度サマリー");
@@ -171,6 +172,27 @@ function renderFinding(finding: Finding): string {
   const remedy = remedyCommand(finding, bestFix);
   if (remedy) {
     lines.push(`**対応コマンド** \`${remedy}\``);
+    lines.push("");
+  }
+
+  if (finding.clearwingRisk) {
+    lines.push("#### リスク");
+    lines.push("");
+    lines.push(finding.clearwingRisk);
+    lines.push("");
+  }
+
+  if (finding.clearwingIncidents) {
+    lines.push("#### 類似インシデント");
+    lines.push("");
+    lines.push(finding.clearwingIncidents);
+    lines.push("");
+  }
+
+  if (finding.clearwingMemo) {
+    lines.push("#### 対応判断メモ");
+    lines.push("");
+    lines.push(finding.clearwingMemo);
     lines.push("");
   }
 

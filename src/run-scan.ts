@@ -1,6 +1,7 @@
 import { collectDependabot } from "./collectors/dependabot.ts";
 import { collectGitleaks } from "./collectors/gitleaks.ts";
 import { collectTrivy } from "./collectors/trivy.ts";
+import { enrichWithClearwing } from "./collectors/clearwing.ts";
 import type {
   CollectorResult,
   CollectorStatus,
@@ -11,12 +12,21 @@ import type {
 import { nowIso, summarizeSeverities } from "./utils.ts";
 
 export async function runScan(request: ScanRequest): Promise<ScanReport> {
+  // Clearwing is a post-processing enrichment step, not a discovery collector.
+  // Run all other tools in parallel first, then enrich.
+  const discoveryTools = request.tools.filter((t) => t !== "clearwing");
   const collectorResults: CollectorResult[] = await Promise.all(
-    request.tools.map((tool) => runCollector(tool, request)),
+    discoveryTools.map((tool) => runCollector(tool, request)),
   );
 
-  const findings = collectorResults.flatMap((result) => result.findings);
+  let findings = collectorResults.flatMap((result) => result.findings);
   const collectorStatuses = collectorResults.map((result) => result.status);
+
+  if (request.tools.includes("clearwing") && request.clearwing?.ackRisk) {
+    const cwResult = await enrichWithClearwing(request, findings);
+    findings = cwResult.enriched;
+    collectorStatuses.push(cwResult.status);
+  }
 
   return {
     repository: request.repo,
@@ -39,7 +49,8 @@ async function runCollector(tool: ToolName, request: ScanRequest): Promise<Colle
     case "trufflehog":
       return notImplemented(tool, "TruffleHog collector is planned for a later phase");
     case "clearwing":
-      return notImplemented(tool, "Clearwing collector is planned for a later phase");
+      // Should not be reached; clearwing is handled above as post-processing.
+      return notImplemented(tool, "Clearwing は後処理ステップとして別途実行されます");
   }
 }
 
