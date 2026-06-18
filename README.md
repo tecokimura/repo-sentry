@@ -56,13 +56,13 @@ echo "exit: $?"
 3. レポートを確認します。
 
 ```text
-reports/YYMMDDHHMM_repo-sentry-docker-scan.md
+reports/YYMMDDHHMM_repo-sentry-scan.md
 ```
 
 例:
 
 ```text
-reports/2606181423_repo-sentry-docker-scan.md
+reports/2606181423_repo-sentry-scan.md
 ```
 
 ## 設定ファイル（.env）
@@ -202,7 +202,7 @@ docker volume rm repo-sentry-ollama-models
 | `--format FORMAT`       | `FORMAT`          | `markdown`                | 出力形式。`markdown` または `json`                        |
 | `--no-sbom`             | `SBOM=false`      | **SBOM 有効**             | 指定すると CycloneDX SBOM 生成をスキップ                  |
 | `--repo OWNER/NAME`     | `REPO`            | 未設定                    | GitHub repository。Dependabot 使用時に必須                |
-| `--report-name NAME`    | `REPORT_NAME`     | `repo-sentry-docker-scan` | レポートファイル名のプレフィックス                        |
+| `--report-name NAME`    | `REPORT_NAME`     | `repo-sentry-scan`        | レポートファイル名のプレフィックス                        |
 | `--fail-on=SEVERITY`    | —                 | `high`                    | 終了コード 1 の閾値。`critical/high/medium/low` を指定可  |
 | `--artifacts-dir=PATH`  | —                 | 未設定                    | raw scanner output (gitleaks/trivy JSON) の保存先         |
 

@@ -57,12 +57,27 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 _START_SECONDS=$SECONDS
 
 # --debug / --help フラグをここで処理し、docker-scan.sh には渡さない
+# --clearwing-depth はレポートファイル名に反映するため先読みする（そのままパススルーもする）
 _debug=0
+_clearwing_depth="standard"
 _pass_args=()
+_skip_next=0
 for _arg in "$@"; do
+  if [[ $_skip_next -eq 1 ]]; then
+    _clearwing_depth="$_arg"
+    _skip_next=0
+    _pass_args+=("$_arg")
+    continue
+  fi
   case "$_arg" in
     --debug) _debug=1 ;;
     -h|--help) usage; exit 0 ;;
+    --clearwing-depth=*)
+      _clearwing_depth="${_arg#*=}"
+      _pass_args+=("$_arg") ;;
+    --clearwing-depth)
+      _skip_next=1
+      _pass_args+=("$_arg") ;;
     *) _pass_args+=("$_arg") ;;
   esac
 done
@@ -130,7 +145,8 @@ fi
 # レポートパスを事前に確定して表示
 _report_dir="$(cd "${REPORTS_DIR:-$PWD/reports}" 2>/dev/null && pwd -P || echo "$PWD/reports")"
 _report_date="${REPORT_DATE:-$(date +%y%m%d%H%M)}"
-_report_name="${REPORT_NAME:-repo-sentry-docker-scan}"
+_report_name_default="repo-sentry-scan-clearwing-${_clearwing_depth}"
+_report_name="${REPORT_NAME:-$_report_name_default}"
 _format="${FORMAT:-markdown}"
 case "$_format" in
   json) _ext="json" ;;
@@ -151,6 +167,7 @@ fi
 _scan_exit=0
 TOOLS="$_tools" \
 OLLAMA_MODEL="$OLLAMA_MODEL" \
+REPORT_NAME="${REPORT_NAME:-$_report_name_default}" \
   "$SCRIPT_DIR/docker-scan.sh" \
   --clearwing-ack-risk \
   "${_pass_args[@]+"${_pass_args[@]}"}" || _scan_exit=$?

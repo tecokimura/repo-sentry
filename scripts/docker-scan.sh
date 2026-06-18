@@ -17,7 +17,7 @@ Options:
                         値: markdown, json
   --no-sbom             SBOM 生成をスキップ (既定では CycloneDX SBOM を生成)
   --repo OWNER/NAME     GitHub repository (dependabot 使用時に必須)
-  --report-name NAME    レポートファイル名のプレフィックス (default: repo-sentry-docker-scan)
+  --report-name NAME    レポートファイル名のプレフィックス (default: repo-sentry-scan)
   -h, --help            このヘルプを表示
 
 repo-sentry CLI に直接渡せるオプション (--flag=value 形式):
@@ -38,7 +38,7 @@ CACHE_DIR="${CACHE_DIR:-$PWD/.repo-sentry}"
 TOOLS="${TOOLS:-gitleaks,trivy}"
 FORMAT="${FORMAT:-markdown}"
 REPORT_DATE="${REPORT_DATE:-$(date +%y%m%d%H%M)}"
-REPORT_NAME="${REPORT_NAME:-repo-sentry-docker-scan}"
+REPORT_NAME="${REPORT_NAME:-repo-sentry-scan}"
 DOCKER_USER="${DOCKER_USER:-$(id -u):$(id -g)}"
 
 # Parse arguments — script-level flags are consumed; unknown --* are collected
