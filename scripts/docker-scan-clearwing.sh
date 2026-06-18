@@ -18,6 +18,7 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
+_START_SECONDS=$SECONDS
 
 # .envからOLLAMA_MODELを読む（シェル変数が未設定の場合）
 _ENV_FILE="${ENV_FILE:-${SCRIPT_DIR}/../.env}"
@@ -111,5 +112,7 @@ case $_scan_exit in
   *) echo "[clearwing] スキャンが終了コード ${_scan_exit} で終了しました。" >&2 ;;
 esac
 echo "[clearwing] レポート: ${_report_path}" >&2
+_elapsed=$(( SECONDS - _START_SECONDS ))
+printf "[clearwing] 所要時間: %d分%02d秒\n" "$(( _elapsed / 60 ))" "$(( _elapsed % 60 ))" >&2
 
 exit $_scan_exit
