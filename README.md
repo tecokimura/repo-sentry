@@ -9,7 +9,7 @@ Docker image 内で次の collector を実行できます。
 - `trivy`: 依存関係の既知脆弱性と、IaC・設定ファイルの misconfiguration チェック。secret 検出は
   `gitleaks` に委ねるため scanner を `vuln,misconfig` に限定しています
 - `dependabot`: GitHub Dependabot alerts API の取得と有効状態診断
-- `clearwing`: LLM（Ollama）による各 finding のリスク分析・対応判断メモ生成（後述）
+- `clearwing`: LLM（Ollama または OpenAI）による各 finding のリスク分析・対応判断メモ生成（後述）
 
 ホストに `gitleaks` や `trivy` を直接インストールする必要はありません。基本は Docker で実行します。
 
@@ -86,8 +86,16 @@ GITHUB_TOKEN=ghp_xxxxxxxxxxxx
 # Slack通知用 Webhook URL（任意）
 SLACK_WEBHOOK_URL=https://hooks.slack.com/...
 
-# Clearwing で使用する Ollama モデル（clearwing使用時のみ参照）
-OLLAMA_MODEL=llama3.2
+# Clearwing プロバイダー（省略時: OPENAI_API_KEY があれば openai、なければ ollama）
+# CLEARWING_PROVIDER=openai
+# CLEARWING_PROVIDER=ollama
+
+# OpenAI を使う場合
+OPENAI_API_KEY=sk-...
+# OPENAI_MODEL=gpt-4o-mini   # 省略時のデフォルト
+
+# Ollama を使う場合
+OLLAMA_MODEL=qwen2.5:7b
 ```
 
 `.env` は `.gitignore` に含まれているため、誤ってコミットされることはありません。
@@ -134,10 +142,27 @@ repo-sentry は、alerts 件数だけでなく、取得元の状態もレポー�
 Clearwing は、スキャン結果の各 finding に対して以下を自動生成します。
 
 - **リスク**: 攻撃シナリオとビジネスへの影響
-- **類似インシデント**: この種の脆弱性に関連する実際の攻撃事例
-- **対応判断メモ**: 影響範囲・対応コスト・放置した場合の最悪シナリオ
+- **悪用シナリオ**: この種の脆弱性が悪用される典型的な流れ
+- **対応判断メモ**: 影響を受ける可能性がある機能・設定・条件
 
-通常スキャンとは**完全に独立したスクリプト**で動作します。`docker-scan.sh` は Ollama を一切使いません。
+通常スキャンとは**完全に独立したスクリプト**で動作します。`docker-scan.sh` は LLM を一切使いません。
+
+### プロバイダーの選択
+
+Clearwing は **Ollama（ローカル）** と **OpenAI API** の両方に対応しています。
+
+`.env` の `CLEARWING_PROVIDER` で切り替えます。
+
+```bash
+CLEARWING_PROVIDER=openai   # OpenAI を使用（OPENAI_API_KEY 必須）
+CLEARWING_PROVIDER=ollama   # Ollama を使用
+# 省略時: OPENAI_API_KEY が設定されていれば openai、なければ ollama
+```
+
+| プロバイダー | 速度 | コスト | プライバシー | 推奨用途 |
+| --- | --- | --- | --- | --- |
+| OpenAI (`gpt-4o-mini`) | 速い | 約 1 円 / 25 件 | データ送信あり | 品質重視・社外プロジェクト |
+| Ollama (ローカル) | 遅い（CPU依存） | 無料 | データ送信なし | オフライン・社内プロジェクト |
 
 ### パターン A: 通常スキャン（LLM なし）
 
@@ -145,9 +170,35 @@ Clearwing は、スキャン結果の各 finding に対して以下を自動生�
 ./scripts/docker-scan.sh /path/to/target-repo
 ```
 
-Ollama は起動しません。シンプルに gitleaks + trivy の結果のみレポートされます。
+LLM は起動しません。シンプルに gitleaks + trivy の結果のみレポートされます。
 
-### パターン B: LLM 分析付きスキャン（Clearwing あり）
+### パターン B: OpenAI で LLM 分析
+
+`.env` に API キーを設定して `docker-scan-clearwing.sh` を実行します。Ollama コンテナは不要です。
+
+```bash
+# .env に設定
+CLEARWING_PROVIDER=openai
+OPENAI_API_KEY=sk-...
+# OPENAI_MODEL=gpt-4o-mini  # 省略可（デフォルト）
+```
+
+```bash
+./scripts/docker-scan-clearwing.sh /path/to/target-repo
+```
+
+OpenAI API キーの発行方法:
+1. [platform.openai.com/api-keys](https://platform.openai.com/api-keys) でキーを作成
+2. Permissions は `Restricted` → `Model capabilities: Write` のみで十分
+3. `Settings → Limits` で月の使用上限を設定しておくことを推奨（$5 で十分）
+
+### パターン C: Ollama（ローカル LLM）で LLM 分析
+
+```bash
+# .env に設定
+CLEARWING_PROVIDER=ollama
+OLLAMA_MODEL=qwen2.5:7b
+```
 
 ```bash
 ./scripts/docker-scan-clearwing.sh /path/to/target-repo
@@ -156,26 +207,19 @@ Ollama は起動しません。シンプルに gitleaks + trivy の結果のみ�
 実行の流れ:
 
 1. Ollama コンテナを自動起動
-2. モデルが未ダウンロードの場合は取得（初回のみ、約 2 GB）
+2. モデルが未ダウンロードの場合は取得（初回のみ、約 4 GB）
 3. スキャンを実行し、critical / high / medium の finding に LLM 分析を追加（standard モード）
 4. スキャン完了後に Ollama コンテナを自動停止・削除
 
-> **初回実行について:** `llama3.2` モデル（約 2 GB）のダウンロードが発生します。
-> 2 回目以降は Docker ボリューム `repo-sentry-ollama-models` にキャッシュされるため、
-> すぐに起動します。
-
-モデルは `.env` の `OLLAMA_MODEL` で変更できます（既定値: `llama3.2`）。
-
+モデルは 2 回目以降 Docker ボリューム `repo-sentry-ollama-models` にキャッシュされます。
 
 ### Clearwing を完全に削除する場合
-
-Ollama の速度が許容できない場合など、完全に取り除く手順:
 
 ```bash
 # 1. Clearwing スクリプトを削除
 rm scripts/docker-scan-clearwing.sh
 
-# 2. Ollama の Docker イメージとモデルキャッシュを削除
+# 2. Ollama の Docker イメージとモデルキャッシュを削除（Ollama 使用時のみ）
 docker rmi ollama/ollama
 docker volume rm repo-sentry-ollama-models
 ```
@@ -283,11 +327,14 @@ CLI オプションは対応する環境変数より優先されます。環境�
 secret は CLI 引数ではなく環境変数（または `.env` ファイル）で渡します。
 repo-sentry は token をレポート、ログ、エラー詳細に出さない方針です。
 
-| 変数                | 用途                                                           | 必須になる条件      |
-| ------------------- | -------------------------------------------------------------- | ------------------- |
-| `GITHUB_TOKEN`      | GitHub API から repository 情報と Dependabot alerts を取得する | `dependabot` 使用時 |
-| `SLACK_WEBHOOK_URL` | Slack 通知用                                                   | Slack reporter 実装後 |
-| `OLLAMA_MODEL`      | Clearwing で使用する Ollama モデル名（既定値: `llama3.2`）     | `clearwing` 使用時  |
+| 変数                  | 用途                                                           | 必須になる条件                  |
+| --------------------- | -------------------------------------------------------------- | ------------------------------- |
+| `GITHUB_TOKEN`        | GitHub API から repository 情報と Dependabot alerts を取得する | `dependabot` 使用時             |
+| `SLACK_WEBHOOK_URL`   | Slack 通知用                                                   | Slack reporter 実装後           |
+| `CLEARWING_PROVIDER`  | Clearwing のプロバイダー指定（`openai` または `ollama`）       | 省略時は自動判定                |
+| `OPENAI_API_KEY`      | OpenAI API キー                                                | `CLEARWING_PROVIDER=openai` 時  |
+| `OPENAI_MODEL`        | 使用する OpenAI モデル（既定値: `gpt-4o-mini`）                | 任意                            |
+| `OLLAMA_MODEL`        | 使用する Ollama モデル（既定値: `llama3.2`）                   | `CLEARWING_PROVIDER=ollama` 時  |
 
 `gitleaks` と `trivy` のみ使用する場合、`GITHUB_TOKEN` は不要です。
 
@@ -344,7 +391,7 @@ Compose で使う主な変数:
 | `LOCAL_GID`         | コンテナ実行ユーザーの GID     |
 | `GITHUB_TOKEN`      | Dependabot alerts API 用       |
 | `SLACK_WEBHOOK_URL` | Slack 通知用。現時点では未実装 |
-| `OPENAI_API_KEY`    | Clearwing 用。現時点では未実装 |
+| `OPENAI_API_KEY`    | Clearwing OpenAI プロバイダー用 |
 
 ## CLI の直接実行
 
@@ -467,8 +514,8 @@ Docker Hub からの `ollama/ollama` イメージ取得に時間がかかって�
 
 **Clearwing の LLM 分析が遅い / 時間がかかりすぎる**
 
-Mac の Docker は Apple Silicon GPU（Metal）が使えないため、CPU のみで推論します。
-`llama3.2`（3B）であれば通常 20〜60 秒 / finding 程度です。
+Ollama 使用時、Mac の Docker は Apple Silicon GPU（Metal）が使えないため CPU のみで推論します。
+`qwen2.5:7b` で通常 20〜60 秒 / finding 程度です。
 `standard` モード（既定）では critical / high / medium を分析するため、medium の件数が多いと
 時間がかかります。`--clearwing-depth=priority` で critical / high のみに絞れます。
 
@@ -476,7 +523,7 @@ Mac の Docker は Apple Silicon GPU（Metal）が使えないため、CPU の�
 ./scripts/docker-scan-clearwing.sh /path/to/target-repo --clearwing-depth=priority
 ```
 
-Mac ネイティブ Ollama への移行も選択肢の一つです（後述）。
+速度を優先する場合は `CLEARWING_PROVIDER=openai` への切り替えも有効です（数秒 / finding）。
 
 ## 現在の実装状態
 
@@ -487,7 +534,7 @@ Mac ネイティブ Ollama への移行も選択肢の一つです（後述）�
 - gitleaks collector
 - Trivy collector
 - Dependabot alerts collector
-- Clearwing collector（Ollama による LLM 分析）
+- Clearwing collector（Ollama / OpenAI による LLM 分析）
 - JSON reporter
 - Markdown reporter
 - CycloneDX SBOM 生成（デフォルト有効、`--no-sbom` で無効化）
