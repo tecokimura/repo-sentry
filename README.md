@@ -56,13 +56,13 @@ echo "exit: $?"
 3. レポートを確認します。
 
 ```text
-reports/YYMMDDHHMM_repo-sentry-scan.md
+reports/YYYYMMDD-HHMM_repo-sentry-scan.md
 ```
 
 例:
 
 ```text
-reports/2606181423_repo-sentry-scan.md
+reports/20260618-1423_repo-sentry-scan.md
 ```
 
 ## 設定ファイル（.env）
@@ -118,7 +118,7 @@ REPORT_NAME=owner-name-security-scan \
 出力例:
 
 ```text
-reports/YYMMDDHHMM_owner-name-security-scan.md
+reports/YYYYMMDD-HHMM_owner-name-security-scan.md
 ```
 
 Dependabot alerts API は、API 実行時に GitHub に新規スキャンをさせるものではありません。GitHub 側で
@@ -174,7 +174,7 @@ LLM は起動しません。シンプルに gitleaks + trivy の結果のみレ�
 
 ### パターン B: OpenAI で LLM 分析
 
-`.env` に API キーを設定して `docker-scan-clearwing.sh` を実行します。Ollama コンテナは不要です。
+`.env` に API キーを設定して `docker-scan-clearwing.sh` を実行します。
 
 ```bash
 # .env に設定
@@ -319,7 +319,7 @@ CLI オプションは対応する環境変数より優先されます。環境�
 | `REPO_SENTRY_IMAGE` | `repo-sentry:local` | 実行する Docker image                           |
 | `REPORTS_DIR`       | `./reports`         | レポート出力先                                  |
 | `CACHE_DIR`         | `./.repo-sentry`    | Deno / Trivy cache 保存先                       |
-| `REPORT_DATE`       | 実行日時            | レポートファイル名の日時部分（形式: YYMMDDHHMM）|
+| `REPORT_DATE`       | 実行日時            | レポートファイル名の日時部分（形式: YYYYMMDD-HHMM）|
 | `DOCKER_USER`       | `$(id -u):$(id -g)` | bind mount へ書き込むための Docker 実行ユーザー |
 
 ## Secret / API Key 変数
@@ -334,7 +334,7 @@ repo-sentry は token をレポート、ログ、エラー詳細に出さない�
 | `CLEARWING_PROVIDER`  | Clearwing のプロバイダー指定（`openai` または `ollama`）       | 省略時は自動判定                |
 | `OPENAI_API_KEY`      | OpenAI API キー                                                | `CLEARWING_PROVIDER=openai` 時  |
 | `OPENAI_MODEL`        | 使用する OpenAI モデル（既定値: `gpt-4o-mini`）                | 任意                            |
-| `OLLAMA_MODEL`        | 使用する Ollama モデル（既定値: `llama3.2`）                   | `CLEARWING_PROVIDER=ollama` 時  |
+| `OLLAMA_MODEL`        | 使用する Ollama モデル（推奨: `qwen2.5:7b`）                   | `CLEARWING_PROVIDER=ollama` 時  |
 
 `gitleaks` と `trivy` のみ使用する場合、`GITHUB_TOKEN` は不要です。
 
