@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -uo pipefail
+
+_START_SECONDS=$SECONDS
 
 usage() {
   cat <<'EOF'
@@ -114,6 +116,12 @@ _suffix_part="${REPORT_SUFFIX:+_${REPORT_SUFFIX}}"
 
 mkdir -p "$REPORTS_DIR/$REPORT_NAME"
 
+_report_path="${REPORTS_DIR}/${REPORT_NAME}/scan_${_short_name}_${_hash}${REPORT_DATE}${_suffix_part}.${extension}"
+
+echo "[sentry-scan] スキャン開始: ${_target_display}" >&2
+echo "[sentry-scan] 対象ツール : ${TOOLS}" >&2
+echo "[sentry-scan] 出力先     : ${_report_path}" >&2
+
 repo_args=()
 if [[ -n "${REPO:-}" ]]; then
   repo_args=(--repo "$REPO")
@@ -127,6 +135,7 @@ if [[ -f "${ENV_FILE:-.env}" ]]; then
   _env_file_args=(--env-file "${ENV_FILE:-.env}")
 fi
 
+_scan_exit=0
 docker run --rm \
   --user "$DOCKER_USER" \
   "${_env_file_args[@]+"${_env_file_args[@]}"}" \
@@ -147,4 +156,18 @@ docker run --rm \
   --tools "$TOOLS" \
   --format "$FORMAT" \
   --output "/workspace/reports/${REPORT_NAME}/scan_${_short_name}_${_hash}${REPORT_DATE}${_suffix_part}.${extension}" \
-  ${passthrough_args[@]+"${passthrough_args[@]}"}
+  ${passthrough_args[@]+"${passthrough_args[@]}"} || _scan_exit=$?
+
+echo "" >&2
+case $_scan_exit in
+  0) echo "[sentry-scan] 完了: 対応が必要な finding はありませんでした。" >&2 ;;
+  1) echo "[sentry-scan] 完了: 対応が必要な finding が検出されました。" >&2 ;;
+  2) echo "[sentry-scan] エラー: 引数またはスキャン設定に問題があります。" >&2 ;;
+  3) echo "[sentry-scan] 警告: 一部の collector でエラーが発生しました。" >&2 ;;
+  *) echo "[sentry-scan] スキャンが終了コード ${_scan_exit} で終了しました。" >&2 ;;
+esac
+echo "[sentry-scan] レポート  : ${_report_path}" >&2
+_elapsed=$(( SECONDS - _START_SECONDS ))
+printf "[sentry-scan] 所要時間  : %d分%02d秒\n" "$(( _elapsed / 60 ))" "$(( _elapsed % 60 ))" >&2
+
+exit $_scan_exit
