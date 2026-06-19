@@ -106,7 +106,6 @@ _container_input="/workspace/reports/${INPUT_FILE#${_reports_dir}/}"
 _container_output="/workspace/reports/${OUTPUT_FILE#${_reports_dir}/}"
 
 echo "[sentry-enrich] エンリッチ開始: $(basename "$INPUT_FILE")" >&2
-echo "[sentry-enrich] 出力先       : ${OUTPUT_FILE}" >&2
 
 _enrich_args=(--input "$_container_input" --output "$_container_output")
 
@@ -128,14 +127,16 @@ docker run --rm \
   "$IMAGE" \
   "${_enrich_args[@]}" || _enrich_exit=$?
 
+_elapsed=$(( SECONDS - _START_SECONDS ))
 echo "" >&2
 case $_enrich_exit in
-  0) echo "[sentry-enrich] 完了: エンリッチが正常に終了しました。" >&2 ;;
+  0)
+    echo "[sentry-enrich] 完了: エンリッチが正常に終了しました。" >&2
+    echo "[sentry-enrich] 生成       : ${OUTPUT_FILE}" >&2
+    ;;
   2) echo "[sentry-enrich] エラー: 引数または入力ファイルに問題があります。" >&2 ;;
   *) echo "[sentry-enrich] エラー: 終了コード ${_enrich_exit} で終了しました。" >&2 ;;
 esac
-echo "[sentry-enrich] レポート   : ${OUTPUT_FILE}" >&2
-_elapsed=$(( SECONDS - _START_SECONDS ))
 printf "[sentry-enrich] 所要時間   : %d分%02d秒\n" "$(( _elapsed / 60 ))" "$(( _elapsed % 60 ))" >&2
 
 exit $_enrich_exit
