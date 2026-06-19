@@ -144,7 +144,7 @@ fi
 
 # レポートパスを事前に確定して表示
 _report_dir="$(cd "${REPORTS_DIR:-$PWD/reports}" 2>/dev/null && pwd -P || echo "$PWD/reports")"
-_report_date="${REPORT_DATE:-$(date +%y%m%d%H%M)}"
+_report_date="${REPORT_DATE:-$(date +%Y%m%d-%H%M)}"
 _report_name_default="repo-sentry-scan-clearwing-${_clearwing_depth}"
 _report_name="${REPORT_NAME:-$_report_name_default}"
 _format="${FORMAT:-markdown}"

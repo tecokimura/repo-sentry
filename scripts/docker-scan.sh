@@ -37,7 +37,7 @@ REPORTS_DIR="${REPORTS_DIR:-$PWD/reports}"
 CACHE_DIR="${CACHE_DIR:-$PWD/.repo-sentry}"
 TOOLS="${TOOLS:-gitleaks,trivy}"
 FORMAT="${FORMAT:-markdown}"
-REPORT_DATE="${REPORT_DATE:-$(date +%y%m%d%H%M)}"
+REPORT_DATE="${REPORT_DATE:-$(date +%Y%m%d-%H%M)}"
 REPORT_NAME="${REPORT_NAME:-repo-sentry-scan}"
 DOCKER_USER="${DOCKER_USER:-$(id -u):$(id -g)}"
 
