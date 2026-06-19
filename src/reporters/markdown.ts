@@ -183,7 +183,7 @@ function renderFinding(finding: Finding): string {
   }
 
   if (finding.clearwingIncidents) {
-    lines.push("#### 類似インシデント");
+    lines.push("#### 悪用シナリオ");
     lines.push("");
     lines.push(finding.clearwingIncidents);
     lines.push("");

@@ -125,24 +125,30 @@ function buildPrompt(finding: Finding): string {
     ? `${finding.packageName} v${finding.packageVersion ?? "不明"}`
     : finding.location ?? "不明";
 
-  return `セキュリティ脆弱性を分析してください。
+  const description = finding.description ? `説明: ${finding.description}\n` : "";
+
+  return `あなたはセキュリティ脆弱性の分析担当です。以下の脆弱性情報をもとに、日本語のみで簡潔に分析してください。
+
+制約:
+* 同じ内容を繰り返さないこと
+* 不明な点は推測せず「判断不可」と書くこと
+* 一般論ではなく、対象パッケージと深刻度に基づいて書くこと
+* 各項目は指定された見出しのみを使うこと
 
 脆弱性名: ${finding.title}
 パッケージ/場所: ${pkg}
 深刻度: ${finding.severity.toUpperCase()}
-
+${description}
 以下の3項目を必ずこの形式で回答してください:
 
 【リスク】
-攻撃者がこの脆弱性を悪用した場合のビジネスへの影響を2〜3文で説明。
+この脆弱性により起こり得る被害と、悪用された場合のビジネス影響を2〜3文で説明する。
 
-【類似インシデント】
-この種の脆弱性に関連する実際の攻撃事例を1件。不明な場合は「確認されていません」と書く。
+【悪用シナリオ】
+この種の脆弱性が悪用される典型的な流れを1文で説明する。
 
 【対応判断メモ】
-- 影響範囲: （影響する機能・条件を1文で）
-- 対応コスト: （パッケージ更新の作業量を1文で）
-- 放置した場合: （最悪シナリオを1文で）`;
+- 影響範囲: このアプリケーションで影響を受ける可能性がある機能・設定・条件を1文で。不明な場合は「判断不可」と書く。`;
 }
 
 async function callOllama(host: string, model: string, prompt: string): Promise<string> {
@@ -183,7 +189,7 @@ function parseSections(
 
   return {
     clearwingRisk: extract("【リスク】"),
-    clearwingIncidents: extract("【類似インシデント】"),
+    clearwingIncidents: extract("【悪用シナリオ】"),
     clearwingMemo: extract("【対応判断メモ】"),
   };
 }
