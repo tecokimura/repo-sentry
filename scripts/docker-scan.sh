@@ -100,14 +100,17 @@ REPORTS_DIR="$(cd "$REPORTS_DIR" && pwd -P)"
 CACHE_DIR="$(cd "$CACHE_DIR" && pwd -P)"
 
 # ターゲットディレクトリ名をレポート名・タイトルに利用
-_target_basename=$(basename "$TARGET_PATH" | tr -cd 'A-Za-z0-9._-' | cut -c1-40)
+# _target_display: レポート本文用（省略なし）
+# _target_basename: ファイル名用（英数字/_/-/. のみ、40文字以内）
+_target_display=$(basename "$TARGET_PATH")
+_target_basename=$(printf '%s' "$_target_display" | tr -cd 'A-Za-z0-9._-' | cut -c1-40)
 REPORT_NAME="${REPORT_NAME:-${_target_basename}}"
 
 repo_args=()
 if [[ -n "${REPO:-}" ]]; then
   repo_args=(--repo "$REPO")
 else
-  repo_args=(--repo "${_target_basename}")
+  repo_args=(--repo "${_target_display}")
 fi
 
 # .envファイルがあればコンテナに渡す（シェル変数が優先される）

@@ -10,6 +10,11 @@ export function renderMarkdownReport(report: ScanReport): string {
   lines.push("");
   const hasClearwing = report.findings.some((f) => f.clearwingRisk);
   lines.push(`Scan date: ${scanDate} (UTC)　Clearwing: ${hasClearwing ? "あり" : "なし"}`);
+  if (report.repository) {
+    lines.push(`Scan target: ${report.repository}`);
+  } else if (report.path && report.path !== ".") {
+    lines.push(`Scan target: ${report.path}`);
+  }
   lines.push("");
 
   lines.push("## 対応優先度サマリー");
