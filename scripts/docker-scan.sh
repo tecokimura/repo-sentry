@@ -17,7 +17,7 @@ Options:
                         値: markdown, json
   --no-sbom             SBOM 生成をスキップ (既定では CycloneDX SBOM を生成)
   --repo OWNER/NAME     GitHub repository (dependabot 使用時に必須)
-  --report-name NAME    レポートファイル名のプレフィックス (default: repo-sentry-scan)
+  --report-name NAME    レポートファイル名のプレフィックス (default: スキャン対象ディレクトリ名)
   -h, --help            このヘルプを表示
 
 repo-sentry CLI に直接渡せるオプション (--flag=value 形式):
@@ -38,7 +38,7 @@ CACHE_DIR="${CACHE_DIR:-$PWD/.repo-sentry}"
 TOOLS="${TOOLS:-gitleaks,trivy}"
 FORMAT="${FORMAT:-markdown}"
 REPORT_DATE="${REPORT_DATE:-$(date +%Y%m%d-%H%M)}"
-REPORT_NAME="${REPORT_NAME:-repo-sentry-scan}"
+REPORT_NAME="${REPORT_NAME:-}"
 DOCKER_USER="${DOCKER_USER:-$(id -u):$(id -g)}"
 
 # Parse arguments — script-level flags are consumed; unknown --* are collected
@@ -87,11 +87,6 @@ case "$FORMAT" in
   *) echo "Unsupported FORMAT: $FORMAT" >&2; exit 2 ;;
 esac
 
-repo_args=()
-if [[ -n "${REPO:-}" ]]; then
-  repo_args=(--repo "$REPO")
-fi
-
 SBOM="${SBOM:-true}"
 sbom_args=()
 if [[ "$SBOM" == "true" ]]; then
@@ -103,6 +98,17 @@ mkdir -p "$REPORTS_DIR" "$CACHE_DIR"
 TARGET_PATH="$(cd "$TARGET_PATH" && pwd -P)"
 REPORTS_DIR="$(cd "$REPORTS_DIR" && pwd -P)"
 CACHE_DIR="$(cd "$CACHE_DIR" && pwd -P)"
+
+# ターゲットディレクトリ名をレポート名・タイトルに利用
+_target_basename=$(basename "$TARGET_PATH" | tr -cd 'A-Za-z0-9._-' | cut -c1-40)
+REPORT_NAME="${REPORT_NAME:-${_target_basename}}"
+
+repo_args=()
+if [[ -n "${REPO:-}" ]]; then
+  repo_args=(--repo "$REPO")
+else
+  repo_args=(--repo "${_target_basename}")
+fi
 
 # .envファイルがあればコンテナに渡す（シェル変数が優先される）
 _env_file_args=()

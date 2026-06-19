@@ -29,7 +29,7 @@ Options:
                                 値: markdown, json
   --no-sbom                     SBOM 生成をスキップ (既定では CycloneDX SBOM を生成)
   --repo OWNER/NAME             GitHub repository (dependabot 使用時に必須)
-  --report-name NAME            レポートファイル名のプレフィックス (default: repo-sentry-docker-scan)
+  --report-name NAME            レポートファイル名のプレフィックス (default: スキャン対象ディレクトリ名)
   --clearwing-depth=DEPTH       LLM 分析の深さ (default: standard)
                                 値: priority (critical/high のみ), standard (+ medium), verbose (+ low)
   --fail-on=SEVERITY            終了コード 1 の閾値 (default: high)
@@ -167,10 +167,17 @@ if [[ "$_tools" != *"clearwing"* ]]; then
   _tools="${_tools},clearwing"
 fi
 
+# ターゲットディレクトリ名をレポート名に利用
+_target_arg="${PWD}"
+for _arg in "${_pass_args[@]+"${_pass_args[@]}"}"; do
+  [[ "$_arg" != --* ]] && { _target_arg="$_arg"; break; }
+done
+_target_basename=$(basename "${_target_arg}" | tr -cd 'A-Za-z0-9._-' | cut -c1-40)
+
 # レポートパスを事前に確定して表示
 _report_dir="$(cd "${REPORTS_DIR:-$PWD/reports}" 2>/dev/null && pwd -P || echo "$PWD/reports")"
 _report_date="${REPORT_DATE:-$(date +%Y%m%d-%H%M)}"
-_report_name_default="repo-sentry-scan-clearwing-${_clearwing_depth}"
+_report_name_default="${_target_basename}-clearwing-${_clearwing_depth}"
 _report_name="${REPORT_NAME:-$_report_name_default}"
 _format="${FORMAT:-markdown}"
 case "$_format" in

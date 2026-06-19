@@ -4,12 +4,12 @@ import { writeTextFile } from "../utils.ts";
 
 export function renderMarkdownReport(report: ScanReport): string {
   const lines: string[] = [];
-  const scanDate = report.scannedAt.slice(0, 10);
+  const scanDate = report.scannedAt.slice(0, 16).replace("T", " ");
 
   lines.push(`# ${reportTitle(report)}`);
   lines.push("");
   const hasClearwing = report.findings.some((f) => f.clearwingRisk);
-  lines.push(`Scan date: ${scanDate}　Clearwing: ${hasClearwing ? "あり" : "なし"}`);
+  lines.push(`Scan date: ${scanDate} (UTC)　Clearwing: ${hasClearwing ? "あり" : "なし"}`);
   lines.push("");
 
   lines.push("## 対応優先度サマリー");
