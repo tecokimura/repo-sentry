@@ -192,13 +192,6 @@ function renderFinding(finding: Finding): string {
     lines.push("");
   }
 
-  if (finding.clearwingIncidents) {
-    lines.push("#### Conditions");
-    lines.push("");
-    lines.push(finding.clearwingIncidents);
-    lines.push("");
-  }
-
   if (finding.clearwingMemo) {
     lines.push("#### Affected Features");
     lines.push("");

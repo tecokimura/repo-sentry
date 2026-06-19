@@ -26,6 +26,8 @@ export async function main(args: string[] = Deno.args): Promise<number> {
     } else {
       if (request.output) {
         await writeMarkdownReport(report, request.output);
+        const jsonOutput = request.output.replace(/\.md$/, ".json");
+        await writeJsonReport(report, jsonOutput);
       } else {
         console.log(renderMarkdownReport(report));
       }
