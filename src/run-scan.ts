@@ -45,8 +45,7 @@ export async function runScan(request: ScanRequest): Promise<ScanReport> {
 function deriveProfile(request: ScanRequest): string {
   if (request.tools.includes("clearwing") && request.clearwing?.ackRisk) {
     const depth = request.clearwing?.depth ?? "standard";
-    const suffix = depth === "priority" ? "pri" : depth === "verbose" ? "vrb" : "std";
-    return `cw-${suffix}`;
+    return `clearwing-${depth}`;
   }
   return "base";
 }

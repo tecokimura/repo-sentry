@@ -75,7 +75,6 @@ sentry-scan
 
 ### 残タスク（優先度低）
 
-- `scanId` / `profile` フィールドを JSON に追加
 - Direct / Transitive Dependency の区別
 - Branch 情報・Commit SHA の記録
 
