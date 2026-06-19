@@ -30,6 +30,8 @@ export async function runScan(request: ScanRequest): Promise<ScanReport> {
   }
 
   return {
+    scanId: crypto.randomUUID(),
+    profile: deriveProfile(request),
     repository: request.repo,
     path: request.path,
     scannedAt: nowIso(),
@@ -38,6 +40,15 @@ export async function runScan(request: ScanRequest): Promise<ScanReport> {
     collectorStatuses,
     findings,
   };
+}
+
+function deriveProfile(request: ScanRequest): string {
+  if (request.tools.includes("clearwing") && request.clearwing?.ackRisk) {
+    const depth = request.clearwing?.depth ?? "standard";
+    const suffix = depth === "priority" ? "pri" : depth === "verbose" ? "vrb" : "std";
+    return `cw-${suffix}`;
+  }
+  return "base";
 }
 
 async function fetchToolVersions(tools: ToolName[], request: ScanRequest): Promise<Record<string, string>> {

@@ -85,6 +85,8 @@ export interface CollectorStatus {
 }
 
 export interface ScanReport {
+  scanId: string;
+  profile: string;
   repository?: string;
   path?: string;
   scannedAt: string;
