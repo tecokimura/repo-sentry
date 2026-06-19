@@ -170,8 +170,8 @@ Impact:
 - <Technical impact e.g.: Session Hijacking / Credential Theft / Data Exfiltration / RCE / Bypass Access Control / Request Smuggling>
 
 【Conditions】
-- <Configuration, state, or prerequisite required for exploitation>
-If not determinable from the information above, write only: - Unknown
+- <Configuration, state, or prerequisite required for exploitation. Only include conditions explicitly stated or directly inferable from the vulnerability description above. Do not add conditions that are not mentioned.>
+If none are stated in the description, write only: - Unknown
 
 【Affected Features】
 - <Application feature or component potentially affected e.g.: File Upload / Email Sending / URL Redirect / Session Handling / HTTP Client>`;
