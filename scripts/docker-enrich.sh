@@ -132,7 +132,7 @@ echo "" >&2
 case $_enrich_exit in
   0)
     echo "[sentry-enrich] 完了: エンリッチが正常に終了しました。" >&2
-    echo "[sentry-enrich] 生成       : ${OUTPUT_FILE}" >&2
+    echo "[sentry-enrich] 生成       : ${OUTPUT_FILE#${PWD}/}" >&2
     ;;
   2) echo "[sentry-enrich] エラー: 引数または入力ファイルに問題があります。" >&2 ;;
   *) echo "[sentry-enrich] エラー: 終了コード ${_enrich_exit} で終了しました。" >&2 ;;
