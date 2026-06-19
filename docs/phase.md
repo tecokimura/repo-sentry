@@ -8,14 +8,59 @@
 
 `repo-sentry` は3つのツールで構成されるモノレポ。
 
+### ソースコード構成
+
 ```
 repo-sentry/
-  sentry-scan/      Phase 1: スキャン・収集
-  sentry-enrich/    Phase 2: 情報補強
-  sentry-report/    Phase 3: 報告書生成
+  src/
+    shared/           共通ユーティリティ（utils.ts 等）
+    sentry-scan/      Phase 1 固有コード
+      cli.ts
+      run-scan.ts
+      collectors/
+      reporters/
+    sentry-enrich/    Phase 2 固有コード
+      main.ts
+      enrichers/
+      reporters/
+    sentry-report/    Phase 3 固有コード
+      main.ts
+      reporters/
+  Dockerfile.scan
+  Dockerfile.enrich
+  Dockerfile.report
+  deno.json           ルートに1つ（Denoキャッシュ共有）
   docs/
   scripts/
+    docker-scan.sh
+    docker-scan-clearwing.sh
+    docker-enrich.sh
+    docker-report.sh
 ```
+
+### 出力ファイル構成
+
+全ツールの成果物を同じ `reports/{project}/` に出力する。
+ファイル名の先頭でどのツールが生成したか判別できる。
+
+```
+reports/
+  CRITTER_PRIVATE_API-master/
+    scan_critter_A3F226041914_cw-std.md          sentry-scan（人間確認用）
+    scan_critter_A3F226041914_cw-std.json        sentry-scan（機械可読）
+    scan_critter_A3F226041914_cw-std.sbom.cdx.json
+    enriched_critter_A3F226041914_cw-std.json    sentry-enrich
+    report_critter_A3F226041914_cw-std.md        sentry-report
+    report_critter_A3F226041914_cw-std.pdf
+```
+
+**ファイル名プレフィックス**
+
+| プレフィックス | 生成ツール |
+| --- | --- |
+| `scan_` | sentry-scan |
+| `enriched_` | sentry-enrich |
+| `report_` | sentry-report |
 
 ### データフロー
 
@@ -25,20 +70,20 @@ repo-sentry/
     ▼
 sentry-scan
     │
-    ├─ scan.json          （構造化スキャン結果）
-    ├─ scan.md            （人間確認用 Markdown）
-    └─ scan.sbom.cdx.json （CycloneDX SBOM）
+    ├─ scan_{id}_cw-std.json   （構造化スキャン結果）
+    ├─ scan_{id}_cw-std.md     （人間確認用 Markdown）
+    └─ scan_{id}_cw-std.sbom.cdx.json
          │
          ▼
     sentry-enrich
          │
-         └─ enriched.json  （外部DB補強済みデータ）
+         └─ enriched_{id}_cw-std.json（外部DB補強済みデータ）
               │
               ▼
          sentry-report
               │
-              ├─ report.md  （チーム向け報告書）
-              └─ report.pdf
+              ├─ report_{id}_cw-std.md  （チーム向け報告書）
+              └─ report_{id}_cw-std.pdf
 ```
 
 ### ツール名の意味
@@ -82,16 +127,17 @@ sentry-scan
 ```
 reports/
   CRITTER_PRIVATE_API-master/
-    critter_377226061914_cw-std.md
-    critter_377226061914_cw-std.json
-    critter_377226061914_cw-std.sbom.cdx.json
+    scan_critter_A3F226041914_cw-std.md
+    scan_critter_A3F226041914_cw-std.json
+    scan_critter_A3F226041914_cw-std.sbom.cdx.json
 ```
 
 **ファイル名の構成**
 
 ```
-{short}_{HASH}{YYMMDDHH}[_{suffix}].{ext}
+{prefix}_{short}_{HASH}{YYMMDDHH}[_{suffix}].{ext}
 
+prefix : scan_（sentry-scan固有）
 short  : プロジェクト名の最初のセグメント（小文字・12文字以内）
 HASH   : プロジェクト名の sha256 頭4文字（大文字）
 YYMMDDHH: 日時（時間単位）

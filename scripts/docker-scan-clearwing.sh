@@ -193,7 +193,7 @@ case "$_format" in
   json) _ext="json" ;;
   *)    _ext="md"   ;;
 esac
-_report_path="${_report_dir}/${_report_name}/${_target_short}_${_target_hash}${_report_date}_${_report_suffix}.${_ext}"
+_report_path="${_report_dir}/${_report_name}/scan_${_target_short}_${_target_hash}${_report_date}_${_report_suffix}.${_ext}"
 
 if [[ $_debug -eq 1 ]]; then
   echo "[clearwing] [debug] provider    : ${_PROVIDER}" >&2

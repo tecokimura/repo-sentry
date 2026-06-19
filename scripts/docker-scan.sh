@@ -146,5 +146,5 @@ docker run --rm \
   ${sbom_args[@]+"${sbom_args[@]}"} \
   --tools "$TOOLS" \
   --format "$FORMAT" \
-  --output "/workspace/reports/${REPORT_NAME}/${_short_name}_${_hash}${REPORT_DATE}${_suffix_part}.${extension}" \
+  --output "/workspace/reports/${REPORT_NAME}/scan_${_short_name}_${_hash}${REPORT_DATE}${_suffix_part}.${extension}" \
   ${passthrough_args[@]+"${passthrough_args[@]}"}
