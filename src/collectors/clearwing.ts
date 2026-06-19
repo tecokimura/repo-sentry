@@ -150,12 +150,12 @@ function buildPrompt(finding: Finding): string {
 
   const description = finding.description ? `説明: ${finding.description}\n` : "";
 
-  return `あなたはセキュリティ脆弱性の分析担当です。以下の脆弱性情報をもとに、日本語のみで簡潔に分析してください。
+  return `あなたはセキュリティ脆弱性の分類担当です。以下の脆弱性情報から構造化された分類情報を抽出してください。
 
 制約:
-* 同じ内容を繰り返さないこと
-* 不明な点は推測せず「判断不可」と書くこと
-* 一般論ではなく、対象パッケージと深刻度に基づいて書くこと
+* 文章ではなく箇条書き・構造化形式のみで記載する
+* 推測や一般論を書かない。提供された情報から判断できる事実のみ記載する
+* 不明な場合は項目を省略するか「不明」と書く
 * 各項目は指定された見出しのみを使うこと
 
 脆弱性名: ${finding.title}
@@ -164,14 +164,18 @@ function buildPrompt(finding: Finding): string {
 ${description}
 以下の3項目を必ずこの形式で回答してください:
 
-【リスク】
-この脆弱性により起こり得る被害と、悪用された場合のビジネス影響を2〜3文で説明する。
+【カテゴリ・影響】
+Category: <脆弱性の種類 例: XSS / SSRF / RCE / SQLi / Path Traversal / Auth Bypass / Validation Bypass / DoS / Header Injection / Deserialization>
+CWE: <CWE番号 例: CWE-79（不明なら省略）>
+Impact:
+- <技術的影響 例: Session Hijacking / Credential Theft / Data Exfiltration / RCE / Bypass Access Control>
 
-【悪用シナリオ】
-この種の脆弱性が悪用される典型的な流れを1文で説明する。
+【悪用条件】
+- <悪用に必要な設定・状態・前提条件 例: Debug Mode Enabled / Uses Temporary Signed URL / Publicly Accessible Endpoint>
 
-【対応判断メモ】
-- 影響範囲: このアプリケーションで影響を受ける可能性がある機能・設定・条件を1文で。不明な場合は「判断不可」と書く。`;
+【影響範囲】
+- UsesFeature: <影響を受ける可能性のある機能 例: File Upload / Email Sending / URL Redirect / Session Handling>
+- Config: <関連する設定 例: files.* / APP_DEBUG=true（該当なし・不明なら省略）>`;
 }
 
 async function callChatCompletion(
@@ -219,8 +223,8 @@ function parseSections(
   };
 
   return {
-    clearwingRisk: extract("【リスク】"),
-    clearwingIncidents: extract("【悪用シナリオ】"),
-    clearwingMemo: extract("【対応判断メモ】"),
+    clearwingRisk: extract("【カテゴリ・影響】"),
+    clearwingIncidents: extract("【悪用条件】"),
+    clearwingMemo: extract("【影響範囲】"),
   };
 }

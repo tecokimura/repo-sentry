@@ -185,21 +185,21 @@ function renderFinding(finding: Finding): string {
   }
 
   if (finding.clearwingRisk) {
-    lines.push("#### リスク");
+    lines.push("#### カテゴリ・影響");
     lines.push("");
     lines.push(finding.clearwingRisk);
     lines.push("");
   }
 
   if (finding.clearwingIncidents) {
-    lines.push("#### 悪用シナリオ");
+    lines.push("#### 悪用条件");
     lines.push("");
     lines.push(finding.clearwingIncidents);
     lines.push("");
   }
 
   if (finding.clearwingMemo) {
-    lines.push("#### 対応判断メモ");
+    lines.push("#### 影響範囲");
     lines.push("");
     lines.push(finding.clearwingMemo);
     lines.push("");
