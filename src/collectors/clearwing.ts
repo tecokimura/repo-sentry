@@ -150,31 +150,31 @@ function buildPrompt(finding: Finding): string {
 
   const description = finding.description ? `説明: ${finding.description}\n` : "";
 
-  return `あなたはセキュリティ脆弱性の分類担当です。以下の脆弱性情報から構造化された分類情報を抽出してください。
+  return `You are a security vulnerability classifier. Extract structured classification data from the vulnerability information below.
 
-制約:
-* 文章ではなく箇条書き・構造化形式のみで記載する
-* 提供された情報から判断できる事実のみ記載する。推測・一般論は禁止
-* 不明な場合は項目を省略するか「不明」と書く
-* 各項目は指定された見出しのみを使うこと
+Rules:
+- Use structured format only. No prose, no narrative text.
+- Include only facts derivable from the provided information. No speculation or generalities.
+- Write in English only. Do not output any other language.
+- Use only the specified section headers.
 
-脆弱性名: ${finding.title}
-パッケージ/場所: ${pkg}
-深刻度: ${finding.severity.toUpperCase()}
+Vulnerability: ${finding.title}
+Package/Location: ${pkg}
+Severity: ${finding.severity.toUpperCase()}
 ${description}
-以下の3項目を必ずこの形式で回答してください:
+Reply with exactly these 3 sections:
 
-【カテゴリ・影響】
-Category: <以下から1つ選ぶ: RCE / XSS / SSRF / SQLi / DoS / Validation Bypass / Open Redirect / Auth Bypass / Info Disclosure / Command Injection / Header Injection / Path Traversal / Deserialization / Other>
-CWE: <入力情報（説明・CVE・GHSA）に明記されている場合のみ記載。例: CWE-79。不明なら省略>
+【Category/Impact】
+Category: <Choose exactly one: RCE / XSS / SSRF / SQLi / DoS / Validation Bypass / Open Redirect / Auth Bypass / Info Disclosure / Command Injection / Header Injection / Path Traversal / Deserialization / Other>
 Impact:
-- <技術的影響 例: Session Hijacking / Credential Theft / Data Exfiltration / RCE / Bypass Access Control>
+- <Technical impact e.g.: Session Hijacking / Credential Theft / Data Exfiltration / RCE / Bypass Access Control / Request Smuggling>
 
-【悪用条件】
-- <悪用に必要な設定・状態・前提条件 例: Debug Mode Enabled / Uses Temporary Signed URL / APP_DEBUG=true>
+【Conditions】
+- <Configuration, state, or prerequisite required for exploitation>
+If not determinable from the information above, write only: - Unknown
 
-【影響機能】
-- <影響を受ける可能性のある機能・コンポーネント 例: File Upload / Email Sending / URL Redirect / Session Handling>`;
+【Affected Features】
+- <Application feature or component potentially affected e.g.: File Upload / Email Sending / URL Redirect / Session Handling / HTTP Client>`;
 }
 
 async function callChatCompletion(
@@ -222,8 +222,8 @@ function parseSections(
   };
 
   return {
-    clearwingRisk: extract("【カテゴリ・影響】"),
-    clearwingIncidents: extract("【悪用条件】"),
-    clearwingMemo: extract("【影響機能】"),
+    clearwingRisk: extract("【Category/Impact】"),
+    clearwingIncidents: extract("【Conditions】"),
+    clearwingMemo: extract("【Affected Features】"),
   };
 }

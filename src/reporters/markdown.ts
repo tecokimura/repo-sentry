@@ -167,6 +167,7 @@ function renderFinding(finding: Finding): string {
   if (altFixes.length > 0) {
     tableRows.push(["他の修正バージョン", altFixes.map((v) => `${v} 以上`).join("、")]);
   }
+  if (finding.cweIds?.length) tableRows.push(["CWE", finding.cweIds.join(", ")]);
   if (finding.url) tableRows.push(["参考", finding.url]);
 
   if (tableRows.length > 0) {
@@ -185,21 +186,21 @@ function renderFinding(finding: Finding): string {
   }
 
   if (finding.clearwingRisk) {
-    lines.push("#### カテゴリ・影響");
+    lines.push("#### Category / Impact");
     lines.push("");
     lines.push(finding.clearwingRisk);
     lines.push("");
   }
 
   if (finding.clearwingIncidents) {
-    lines.push("#### 悪用条件");
+    lines.push("#### Conditions");
     lines.push("");
     lines.push(finding.clearwingIncidents);
     lines.push("");
   }
 
   if (finding.clearwingMemo) {
-    lines.push("#### 影響機能");
+    lines.push("#### Affected Features");
     lines.push("");
     lines.push(finding.clearwingMemo);
     lines.push("");

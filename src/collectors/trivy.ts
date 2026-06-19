@@ -22,6 +22,7 @@ interface TrivyVulnerability {
   Description?: string;
   Severity?: string;
   PrimaryURL?: string;
+  CweIDs?: string[];
 }
 
 interface TrivyMisconfiguration {
@@ -219,6 +220,7 @@ function normalizeVulnerability(
     packageName: vulnerability.PkgName,
     packageVersion: vulnerability.InstalledVersion,
     fixedVersion: vulnerability.FixedVersion,
+    cweIds: vulnerability.CweIDs?.length ? vulnerability.CweIDs : undefined,
     rawReportPath,
     raw: {
       target: result.Target,

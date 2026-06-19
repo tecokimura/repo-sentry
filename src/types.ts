@@ -52,6 +52,7 @@ export interface Finding {
   packageName?: string;
   packageVersion?: string;
   fixedVersion?: string;
+  cweIds?: string[];
   clearwingRisk?: string;
   clearwingIncidents?: string;
   clearwingMemo?: string;
