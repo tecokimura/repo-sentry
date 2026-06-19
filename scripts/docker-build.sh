@@ -1,11 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-IMAGE="${REPO_SENTRY_IMAGE:-repo-sentry:local}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 
-docker build \
-  --build-arg DENO_VERSION="${DENO_VERSION:-2.5.6}" \
-  --build-arg GITLEAKS_VERSION="${GITLEAKS_VERSION:-8.30.1}" \
-  --build-arg TRIVY_VERSION="${TRIVY_VERSION:-0.70.0}" \
-  -t "$IMAGE" \
-  .
+"$SCRIPT_DIR/docker-build-scan.sh"
+"$SCRIPT_DIR/docker-build-enrich.sh"
