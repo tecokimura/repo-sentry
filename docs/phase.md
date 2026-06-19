@@ -75,8 +75,7 @@ sentry-scan
 
 ### 残タスク（優先度低）
 
-- Direct / Transitive Dependency の区別
-- Branch 情報・Commit SHA の記録
+- Direct / Transitive Dependency の区別（Phase 2 で SBOM から判定予定）
 
 ### 出力ファイル
 

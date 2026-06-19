@@ -15,9 +15,10 @@ export async function runScan(request: ScanRequest): Promise<ScanReport> {
   // Clearwing is a post-processing enrichment step, not a discovery collector.
   // Run all other tools in parallel first, then enrich.
   const discoveryTools = request.tools.filter((t) => t !== "clearwing");
-  const [collectorResults, toolVersions] = await Promise.all([
+  const [collectorResults, toolVersions, gitInfo] = await Promise.all([
     Promise.all(discoveryTools.map((tool) => runCollector(tool, request))),
     fetchToolVersions(request.tools, request),
+    fetchGitInfo(request.path),
   ]);
 
   let findings = collectorResults.flatMap((result) => result.findings);
@@ -34,12 +35,36 @@ export async function runScan(request: ScanRequest): Promise<ScanReport> {
     profile: deriveProfile(request),
     repository: request.repo,
     path: request.path,
+    ...gitInfo,
     scannedAt: nowIso(),
     toolVersions,
     summary: summarizeSeverities(findings),
     collectorStatuses,
     findings,
   };
+}
+
+async function fetchGitInfo(path?: string): Promise<{ gitBranch?: string; gitCommit?: string }> {
+  if (!path) return {};
+  try {
+    const run = async (args: string[]) => {
+      const { stdout, code } = await new Deno.Command("git", {
+        args,
+        cwd: path,
+        stdout: "piped",
+        stderr: "null",
+      }).output();
+      if (code !== 0) return undefined;
+      return new TextDecoder().decode(stdout).trim() || undefined;
+    };
+    const [gitBranch, gitCommit] = await Promise.all([
+      run(["rev-parse", "--abbrev-ref", "HEAD"]),
+      run(["rev-parse", "HEAD"]),
+    ]);
+    return { gitBranch, gitCommit };
+  } catch {
+    return {};
+  }
 }
 
 function deriveProfile(request: ScanRequest): string {

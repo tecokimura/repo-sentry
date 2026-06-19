@@ -89,6 +89,8 @@ export interface ScanReport {
   profile: string;
   repository?: string;
   path?: string;
+  gitBranch?: string;
+  gitCommit?: string;
   scannedAt: string;
   toolVersions?: Record<string, string>;
   summary: SeveritySummary;
