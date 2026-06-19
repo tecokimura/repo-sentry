@@ -3,7 +3,9 @@ import type { CollectorStatus, Finding, ScanRequest } from "../types.ts";
 import { safeErrorMessage } from "../utils.ts";
 
 const DEFAULT_OLLAMA_HOST = "http://host.docker.internal:11434";
-const DEFAULT_MODEL = "llama3.2";
+const DEFAULT_OLLAMA_MODEL = "llama3.2";
+const DEFAULT_OPENAI_HOST = "https://api.openai.com";
+const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
 
 export interface ClearwingResult {
   status: CollectorStatus;
@@ -16,8 +18,14 @@ export async function enrichWithClearwing(
 ): Promise<ClearwingResult> {
   const timing = startCollector();
 
-  const host = request.clearwing?.ollamaHost ?? DEFAULT_OLLAMA_HOST;
-  const model = request.clearwing?.ollamaModel ?? DEFAULT_MODEL;
+  const openaiApiKey = request.clearwing?.openaiApiKey;
+  const host = openaiApiKey
+    ? DEFAULT_OPENAI_HOST
+    : (request.clearwing?.ollamaHost ?? DEFAULT_OLLAMA_HOST);
+  const model = openaiApiKey
+    ? (request.clearwing?.openaiModel ?? DEFAULT_OPENAI_MODEL)
+    : (request.clearwing?.ollamaModel ?? DEFAULT_OLLAMA_MODEL);
+  const provider = openaiApiKey ? "openai" : "ollama";
   const depth = request.clearwing?.depth ?? "standard";  // priority / standard / verbose
   const targets = filterByDepth(findings, depth);
 
@@ -28,16 +36,20 @@ export async function enrichWithClearwing(
     return { status, enriched: findings };
   }
 
-  try {
-    await checkOllama(host, model);
-  } catch (error) {
-    const { status } = failCollector(
-      "clearwing",
-      timing,
-      `Ollamaに接続できません: ${safeErrorMessage(error)}`,
-    );
-    return { status, enriched: findings };
+  if (provider === "ollama") {
+    try {
+      await checkOllama(host, model);
+    } catch (error) {
+      const { status } = failCollector(
+        "clearwing",
+        timing,
+        `Ollamaに接続できません: ${safeErrorMessage(error)}`,
+      );
+      return { status, enriched: findings };
+    }
   }
+
+  console.error(`[clearwing] provider: ${provider}, model: ${model}`);
 
   const targetSet = new Set(targets);
   const enrichedFindings: Finding[] = [];
@@ -57,7 +69,7 @@ export async function enrichWithClearwing(
     const findingStart = Date.now();
 
     try {
-      const sections = await analyzeOnce(host, model, finding);
+      const sections = await analyzeOnce(host, model, finding, openaiApiKey);
       enrichedFindings.push({ ...finding, ...sections });
       enrichedCount++;
       console.error(`[clearwing] <DONE> (${current}/${total}): ${label} [${severity}] (${formatDuration(Math.floor((Date.now() - findingStart) / 1000))})`);
@@ -114,9 +126,10 @@ async function analyzeOnce(
   host: string,
   model: string,
   finding: Finding,
+  apiKey?: string,
 ): Promise<{ clearwingRisk?: string; clearwingIncidents?: string; clearwingMemo?: string }> {
   const prompt = buildPrompt(finding);
-  const raw = await callOllama(host, model, prompt);
+  const raw = await callChatCompletion(host, model, prompt, apiKey);
   return parseSections(raw);
 }
 
@@ -151,10 +164,18 @@ ${description}
 - 影響範囲: このアプリケーションで影響を受ける可能性がある機能・設定・条件を1文で。不明な場合は「判断不可」と書く。`;
 }
 
-async function callOllama(host: string, model: string, prompt: string): Promise<string> {
+async function callChatCompletion(
+  host: string,
+  model: string,
+  prompt: string,
+  apiKey?: string,
+): Promise<string> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+
   const res = await fetch(`${host}/v1/chat/completions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({
       model,
       messages: [{ role: "user", content: prompt }],

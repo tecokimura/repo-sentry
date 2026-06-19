@@ -77,6 +77,8 @@ export function toScanRequest(options: CliRunOptions): ScanRequest {
       ackRisk: options.clearwingAckRisk,
       ollamaHost: options.ollamaHost ?? readEnv("OLLAMA_HOST"),
       ollamaModel: options.ollamaModel ?? readEnv("OLLAMA_MODEL"),
+      openaiApiKey: readEnv("OPENAI_API_KEY"),
+      openaiModel: readEnv("OPENAI_MODEL"),
     },
   };
 }

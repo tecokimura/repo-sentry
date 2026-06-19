@@ -109,6 +109,8 @@ export interface ScanRequest {
     ackRisk: boolean;
     ollamaHost?: string;
     ollamaModel?: string;
+    openaiApiKey?: string;
+    openaiModel?: string;
   };
 }
 
