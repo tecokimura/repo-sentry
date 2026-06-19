@@ -82,56 +82,81 @@ for _arg in "$@"; do
   esac
 done
 
-# .envからOLLAMA_MODELを読む（シェル変数が未設定の場合）
+# .envから各変数を読む（シェル変数が未設定の場合）
 _ENV_FILE="${ENV_FILE:-${SCRIPT_DIR}/../.env}"
-if [[ -z "${OLLAMA_MODEL:-}" ]] && [[ -f "$_ENV_FILE" ]]; then
-  _model_from_env=$(grep -E "^OLLAMA_MODEL=" "$_ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- || true)
-  [[ -n "$_model_from_env" ]] && OLLAMA_MODEL="$_model_from_env"
+if [[ -f "$_ENV_FILE" ]]; then
+  if [[ -z "${OLLAMA_MODEL:-}" ]]; then
+    _val=$(grep -E "^OLLAMA_MODEL=" "$_ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- || true)
+    [[ -n "$_val" ]] && OLLAMA_MODEL="$_val"
+  fi
+  if [[ -z "${CLEARWING_PROVIDER:-}" ]]; then
+    _val=$(grep -E "^CLEARWING_PROVIDER=" "$_ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- || true)
+    [[ -n "$_val" ]] && CLEARWING_PROVIDER="$_val"
+  fi
+  if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+    _val=$(grep -E "^OPENAI_API_KEY=" "$_ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- || true)
+    [[ -n "$_val" ]] && OPENAI_API_KEY="$_val"
+  fi
 fi
 OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.2}"
 OLLAMA_IMAGE="${OLLAMA_IMAGE:-ollama/ollama}"
 OLLAMA_VOLUME="repo-sentry-ollama-models"
 
+# プロバイダーを決定（clearwing.tsと同じロジック）
+if [[ -n "${CLEARWING_PROVIDER:-}" ]]; then
+  _PROVIDER="${CLEARWING_PROVIDER}"
+elif [[ -n "${OPENAI_API_KEY:-}" ]]; then
+  _PROVIDER="openai"
+else
+  _PROVIDER="ollama"
+fi
+
 # PIDベースのユニーク名
 _RUN_ID="$$"
 _CONTAINER="repo-sentry-ollama-${_RUN_ID}"
 
+_ollama_started=0
 cleanup() {
-  echo "[clearwing] Ollamaコンテナを停止中..." >&2
-  docker stop "$_CONTAINER" >/dev/null 2>&1 || true
-  docker rm   "$_CONTAINER" >/dev/null 2>&1 || true
+  if [[ $_ollama_started -eq 1 ]]; then
+    echo "[clearwing] Ollamaコンテナを停止中..." >&2
+    docker stop "$_CONTAINER" >/dev/null 2>&1 || true
+    docker rm   "$_CONTAINER" >/dev/null 2>&1 || true
+  fi
 }
 trap cleanup EXIT INT TERM
 
-echo "[clearwing] Ollamaコンテナを起動中 (model: ${OLLAMA_MODEL})..." >&2
-# -p 11434:11434 でポートをホストに公開 → repo-sentry は host.docker.internal:11434 で接続
-docker run -d \
-  --name "$_CONTAINER" \
-  -p 11434:11434 \
-  -e OLLAMA_HOST=0.0.0.0 \
-  -v "${OLLAMA_VOLUME}:/root/.ollama" \
-  "$OLLAMA_IMAGE" >/dev/null || {
-  echo "[clearwing] エラー: Ollamaコンテナの起動に失敗しました。" >&2
-  echo "[clearwing] ポート 11434 が既に使用中の場合は他の Ollama プロセスを停止してください。" >&2
-  exit 1
-}
-
-# Ollama API 起動待機（最大30秒）
-echo "[clearwing] Ollama API の起動を待機中..." >&2
-_waited=0
-until docker exec "$_CONTAINER" ollama list >/dev/null 2>&1; do
-  _waited=$(( _waited + 1 ))
-  if [[ $_waited -ge 30 ]]; then
-    echo "[clearwing] エラー: Ollamaの起動がタイムアウトしました" >&2
+if [[ "$_PROVIDER" == "ollama" ]]; then
+  echo "[clearwing] Ollamaコンテナを起動中 (model: ${OLLAMA_MODEL})..." >&2
+  # -p 11434:11434 でポートをホストに公開 → repo-sentry は host.docker.internal:11434 で接続
+  docker run -d \
+    --name "$_CONTAINER" \
+    -p 11434:11434 \
+    -e OLLAMA_HOST=0.0.0.0 \
+    -v "${OLLAMA_VOLUME}:/root/.ollama" \
+    "$OLLAMA_IMAGE" >/dev/null || {
+    echo "[clearwing] エラー: Ollamaコンテナの起動に失敗しました。" >&2
+    echo "[clearwing] ポート 11434 が既に使用中の場合は他の Ollama プロセスを停止してください。" >&2
     exit 1
-  fi
-  sleep 1
-done
+  }
+  _ollama_started=1
 
-# モデルがなければpull（初回のみ、以降はボリュームキャッシュを使用）
-if ! docker exec "$_CONTAINER" ollama list 2>/dev/null | grep -q "^${OLLAMA_MODEL%%:*}"; then
-  echo "[clearwing] モデル ${OLLAMA_MODEL} をダウンロード中（初回のみ）..." >&2
-  docker exec "$_CONTAINER" ollama pull "$OLLAMA_MODEL"
+  # Ollama API 起動待機（最大30秒）
+  echo "[clearwing] Ollama API の起動を待機中..." >&2
+  _waited=0
+  until docker exec "$_CONTAINER" ollama list >/dev/null 2>&1; do
+    _waited=$(( _waited + 1 ))
+    if [[ $_waited -ge 30 ]]; then
+      echo "[clearwing] エラー: Ollamaの起動がタイムアウトしました" >&2
+      exit 1
+    fi
+    sleep 1
+  done
+
+  # モデルがなければpull（初回のみ、以降はボリュームキャッシュを使用）
+  if ! docker exec "$_CONTAINER" ollama list 2>/dev/null | grep -q "^${OLLAMA_MODEL%%:*}"; then
+    echo "[clearwing] モデル ${OLLAMA_MODEL} をダウンロード中（初回のみ）..." >&2
+    docker exec "$_CONTAINER" ollama pull "$OLLAMA_MODEL"
+  fi
 fi
 
 echo "[clearwing] スキャンを開始します..." >&2
@@ -155,11 +180,14 @@ esac
 _report_path="${_report_dir}/${_report_date}_${_report_name}.${_ext}"
 
 if [[ $_debug -eq 1 ]]; then
-  echo "[clearwing] [debug] OLLAMA_HOST : http://host.docker.internal:11434 (デフォルト)" >&2
-  echo "[clearwing] [debug] Ollamaコンテナの状態:" >&2
-  { docker inspect "$_CONTAINER" \
-    --format '  name={{.Name}} status={{.State.Status}} ports={{json .NetworkSettings.Ports}}' \
-    2>/dev/null || echo "  (コンテナ情報取得失敗)"; } >&2
+  echo "[clearwing] [debug] provider    : ${_PROVIDER}" >&2
+  if [[ "$_PROVIDER" == "ollama" ]]; then
+    echo "[clearwing] [debug] OLLAMA_HOST : http://host.docker.internal:11434 (デフォルト)" >&2
+    echo "[clearwing] [debug] Ollamaコンテナの状態:" >&2
+    { docker inspect "$_CONTAINER" \
+      --format '  name={{.Name}} status={{.State.Status}} ports={{json .NetworkSettings.Ports}}' \
+      2>/dev/null || echo "  (コンテナ情報取得失敗)"; } >&2
+  fi
 fi
 
 # docker-scan.sh を呼び出す（終了コードを保存）
@@ -189,14 +217,17 @@ printf "[clearwing] 所要時間: %d分%02d秒\n" "$(( _elapsed / 60 ))" "$(( _e
 if [[ $_debug -eq 1 ]] || [[ $_scan_exit -ge 2 ]]; then
   echo "" >&2
   echo "[clearwing] === 診断ログ ===" >&2
-  echo "[clearwing] 接続設定:" >&2
-  echo "  OLLAMA_HOST : http://host.docker.internal:11434" >&2
-  echo "[clearwing] Ollamaコンテナ状態:" >&2
-  { docker inspect "$_CONTAINER" \
-    --format '  status={{.State.Status}}  ports={{json .NetworkSettings.Ports}}' \
-    2>/dev/null || echo "  (コンテナが見つかりません)"; } >&2
-  echo "[clearwing] Ollamaコンテナログ (直近20行):" >&2
-  docker logs --tail 20 "$_CONTAINER" 2>&1 | sed 's/^/  /' >&2 || true
+  echo "[clearwing] provider: ${_PROVIDER}" >&2
+  if [[ "$_PROVIDER" == "ollama" ]]; then
+    echo "[clearwing] 接続設定:" >&2
+    echo "  OLLAMA_HOST : http://host.docker.internal:11434" >&2
+    echo "[clearwing] Ollamaコンテナ状態:" >&2
+    { docker inspect "$_CONTAINER" \
+      --format '  status={{.State.Status}}  ports={{json .NetworkSettings.Ports}}' \
+      2>/dev/null || echo "  (コンテナが見つかりません)"; } >&2
+    echo "[clearwing] Ollamaコンテナログ (直近20行):" >&2
+    docker logs --tail 20 "$_CONTAINER" 2>&1 | sed 's/^/  /' >&2 || true
+  fi
   echo "[clearwing] =================" >&2
   echo "[clearwing] ヒント: レポートの「Collector 実行結果」にエラー詳細が記載されています。" >&2
   [[ $_scan_exit -ge 2 ]] && echo "[clearwing]         詳細確認には --debug オプションを追加してください。" >&2
