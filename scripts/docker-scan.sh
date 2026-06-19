@@ -37,8 +37,9 @@ REPORTS_DIR="${REPORTS_DIR:-$PWD/reports}"
 CACHE_DIR="${CACHE_DIR:-$PWD/.repo-sentry}"
 TOOLS="${TOOLS:-gitleaks,trivy}"
 FORMAT="${FORMAT:-markdown}"
-REPORT_DATE="${REPORT_DATE:-$(date +%Y%m%d-%H%M)}"
+REPORT_DATE="${REPORT_DATE:-$(date +%y%m%d%H)}"
 REPORT_NAME="${REPORT_NAME:-}"
+REPORT_SUFFIX="${REPORT_SUFFIX:-}"
 DOCKER_USER="${DOCKER_USER:-$(id -u):$(id -g)}"
 
 # Parse arguments — script-level flags are consumed; unknown --* are collected
@@ -101,10 +102,17 @@ CACHE_DIR="$(cd "$CACHE_DIR" && pwd -P)"
 
 # ターゲットディレクトリ名をレポート名・タイトルに利用
 # _target_display: レポート本文用（省略なし）
-# _target_basename: ファイル名用（英数字/_/-/. のみ、40文字以内）
+# _target_basename: サブディレクトリ名用（英数字/_/-/. のみ、40文字以内）
+# _short_name: ファイル名プレフィックス（最初の_区切り要素、小文字、12文字以内）
+# _hash: _target_basenameのsha256頭4文字（大文字）
 _target_display=$(basename "$TARGET_PATH")
 _target_basename=$(printf '%s' "$_target_display" | tr -cd 'A-Za-z0-9._-' | cut -c1-40)
+_short_name=$(printf '%s' "$_target_basename" | cut -d'_' -f1 | tr 'A-Z' 'a-z' | cut -c1-12)
+_hash=$(printf '%s' "$_target_basename" | sha256sum | tr 'a-f' 'A-F' | cut -c1-4)
 REPORT_NAME="${REPORT_NAME:-${_target_basename}}"
+_suffix_part="${REPORT_SUFFIX:+_${REPORT_SUFFIX}}"
+
+mkdir -p "$REPORTS_DIR/$REPORT_NAME"
 
 repo_args=()
 if [[ -n "${REPO:-}" ]]; then
@@ -138,5 +146,5 @@ docker run --rm \
   ${sbom_args[@]+"${sbom_args[@]}"} \
   --tools "$TOOLS" \
   --format "$FORMAT" \
-  --output "/workspace/reports/${REPORT_DATE}_${REPORT_NAME}.${extension}" \
+  --output "/workspace/reports/${REPORT_NAME}/${_short_name}_${_hash}${REPORT_DATE}${_suffix_part}.${extension}" \
   ${passthrough_args[@]+"${passthrough_args[@]}"}

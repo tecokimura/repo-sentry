@@ -173,18 +173,27 @@ for _arg in "${_pass_args[@]+"${_pass_args[@]}"}"; do
   [[ "$_arg" != --* ]] && { _target_arg="$_arg"; break; }
 done
 _target_basename=$(basename "${_target_arg}" | tr -cd 'A-Za-z0-9._-' | cut -c1-40)
+_target_short=$(printf '%s' "$_target_basename" | cut -d'_' -f1 | tr 'A-Z' 'a-z' | cut -c1-12)
+_target_hash=$(printf '%s' "$_target_basename" | sha256sum | tr 'a-f' 'A-F' | cut -c1-4)
+
+# depth → ファイル名サフィックス
+case "$_clearwing_depth" in
+  priority) _cw_suffix="cw-pri" ;;
+  verbose)  _cw_suffix="cw-vrb" ;;
+  *)        _cw_suffix="cw-std" ;;
+esac
 
 # レポートパスを事前に確定して表示
 _report_dir="$(cd "${REPORTS_DIR:-$PWD/reports}" 2>/dev/null && pwd -P || echo "$PWD/reports")"
-_report_date="${REPORT_DATE:-$(date +%Y%m%d-%H%M)}"
-_report_name_default="${_target_basename}-clearwing-${_clearwing_depth}"
-_report_name="${REPORT_NAME:-$_report_name_default}"
+_report_date="${REPORT_DATE:-$(date +%y%m%d%H)}"
+_report_name="${REPORT_NAME:-$_target_basename}"
+_report_suffix="${REPORT_SUFFIX:-$_cw_suffix}"
 _format="${FORMAT:-markdown}"
 case "$_format" in
   json) _ext="json" ;;
   *)    _ext="md"   ;;
 esac
-_report_path="${_report_dir}/${_report_date}_${_report_name}.${_ext}"
+_report_path="${_report_dir}/${_report_name}/${_target_short}_${_target_hash}${_report_date}_${_report_suffix}.${_ext}"
 
 if [[ $_debug -eq 1 ]]; then
   echo "[clearwing] [debug] provider    : ${_PROVIDER}" >&2
@@ -202,7 +211,8 @@ fi
 _scan_exit=0
 TOOLS="$_tools" \
 OLLAMA_MODEL="$OLLAMA_MODEL" \
-REPORT_NAME="${REPORT_NAME:-$_report_name_default}" \
+REPORT_NAME="${REPORT_NAME:-$_target_basename}" \
+REPORT_SUFFIX="${REPORT_SUFFIX:-$_cw_suffix}" \
   "$SCRIPT_DIR/docker-scan.sh" \
   --clearwing-ack-risk \
   "${_pass_args[@]+"${_pass_args[@]}"}" || _scan_exit=$?
