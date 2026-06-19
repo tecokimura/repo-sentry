@@ -44,7 +44,6 @@ export async function enrichWithClearwing(
   let enrichedCount = 0;
   let failedCount = 0;
   const total = targets.length;
-
   for (const finding of findings) {
     if (!targetSet.has(finding)) {
       enrichedFindings.push(finding);
@@ -53,15 +52,19 @@ export async function enrichWithClearwing(
 
     const current = enrichedCount + failedCount + 1;
     const label = finding.id ?? finding.title.slice(0, 50);
-    console.error(`[clearwing] 分析中 (${current}/${total}): ${label} [${finding.severity.toUpperCase()}]`);
+    const severity = finding.severity.toUpperCase();
+    console.error(`[clearwing] <SCAN> (${current}/${total}): ${label} [${severity}]`);
+    const findingStart = Date.now();
 
     try {
       const sections = await analyzeOnce(host, model, finding);
       enrichedFindings.push({ ...finding, ...sections });
       enrichedCount++;
+      console.error(`[clearwing] <DONE> (${current}/${total}): ${label} [${severity}] (${formatDuration(Math.floor((Date.now() - findingStart) / 1000))})`);
     } catch {
       enrichedFindings.push(finding);
       failedCount++;
+      console.error(`[clearwing] <FAIL> (${current}/${total}): ${label} [${severity}] (${formatDuration(Math.floor((Date.now() - findingStart) / 1000))})`);
     }
   }
 
@@ -70,6 +73,14 @@ export async function enrichWithClearwing(
 
   const status = completeCollector("clearwing", timing, enrichedCount, { notes });
   return { status, enriched: enrichedFindings };
+}
+
+function formatDuration(secs: number): string {
+  if (secs < 60) return `${secs}s`;
+  if (secs < 3600) return `${Math.floor(secs / 60)}m${String(secs % 60).padStart(2, "0")}s`;
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  return `${h}h${String(m).padStart(2, "0")}m${String(secs % 60).padStart(2, "0")}s`;
 }
 
 function filterByDepth(findings: Finding[], depth: "priority" | "standard" | "verbose"): Finding[] {
