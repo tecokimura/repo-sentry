@@ -75,6 +75,7 @@ export function toScanRequest(options: CliRunOptions): ScanRequest {
       budget: options.clearwingBudget,
       timeout: options.clearwingTimeout,
       ackRisk: options.clearwingAckRisk,
+      provider: parseClearwingProvider(readEnv("CLEARWING_PROVIDER")),
       ollamaHost: options.ollamaHost ?? readEnv("OLLAMA_HOST"),
       ollamaModel: options.ollamaModel ?? readEnv("OLLAMA_MODEL"),
       openaiApiKey: readEnv("OPENAI_API_KEY"),
@@ -184,6 +185,11 @@ function validateOptions(options: CliRunOptions): void {
       throw new Error("Clearwing depth 'verbose' is not allowed in the default CLI flow");
     }
   }
+}
+
+function parseClearwingProvider(value: string | undefined): "openai" | "ollama" | undefined {
+  if (value === "openai" || value === "ollama") return value;
+  return undefined;
 }
 
 function readEnv(name: string): string | undefined {

@@ -107,6 +107,7 @@ export interface ScanRequest {
     budget?: number;
     timeout?: string;
     ackRisk: boolean;
+    provider?: "openai" | "ollama";
     ollamaHost?: string;
     ollamaModel?: string;
     openaiApiKey?: string;

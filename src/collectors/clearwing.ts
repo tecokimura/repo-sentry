@@ -19,13 +19,14 @@ export async function enrichWithClearwing(
   const timing = startCollector();
 
   const openaiApiKey = request.clearwing?.openaiApiKey;
-  const host = openaiApiKey
+  const provider = request.clearwing?.provider
+    ?? (openaiApiKey ? "openai" : "ollama");
+  const host = provider === "openai"
     ? DEFAULT_OPENAI_HOST
     : (request.clearwing?.ollamaHost ?? DEFAULT_OLLAMA_HOST);
-  const model = openaiApiKey
+  const model = provider === "openai"
     ? (request.clearwing?.openaiModel ?? DEFAULT_OPENAI_MODEL)
     : (request.clearwing?.ollamaModel ?? DEFAULT_OLLAMA_MODEL);
-  const provider = openaiApiKey ? "openai" : "ollama";
   const depth = request.clearwing?.depth ?? "standard";  // priority / standard / verbose
   const targets = filterByDepth(findings, depth);
 
@@ -33,6 +34,15 @@ export async function enrichWithClearwing(
     const status = completeCollector("clearwing", timing, 0, {
       notes: ["分析対象の検出なし"],
     });
+    return { status, enriched: findings };
+  }
+
+  if (provider === "openai" && !openaiApiKey) {
+    const { status } = failCollector(
+      "clearwing",
+      timing,
+      "OPENAI_API_KEY が設定されていません",
+    );
     return { status, enriched: findings };
   }
 
