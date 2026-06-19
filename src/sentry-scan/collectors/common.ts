@@ -1,5 +1,5 @@
 import type { CollectorResult, CollectorStatus, ToolName } from "../types.ts";
-import { elapsedMs, nowIso, safeErrorMessage, sanitizeForLog } from "../utils.ts";
+import { elapsedMs, nowIso, safeErrorMessage, sanitizeForLog } from "../../shared/utils.ts";
 
 export interface CollectorTiming {
   startedAt: string;

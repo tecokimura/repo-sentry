@@ -4,7 +4,7 @@ import { evaluatePolicy } from "./policy.ts";
 import { renderJsonReport, writeJsonReport } from "./reporters/json.ts";
 import { renderMarkdownReport, writeMarkdownReport } from "./reporters/markdown.ts";
 import { runScan } from "./run-scan.ts";
-import { safeErrorMessage } from "./utils.ts";
+import { safeErrorMessage } from "../shared/utils.ts";
 
 export async function main(args: string[] = Deno.args): Promise<number> {
   if (args.length === 0 || args.includes("--help") || args.includes("-h")) {

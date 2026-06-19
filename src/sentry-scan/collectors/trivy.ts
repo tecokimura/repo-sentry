@@ -1,6 +1,6 @@
 import { completeCollector, failCollector, startCollector } from "./common.ts";
 import type { CollectorResult, Finding, FindingCategory, ScanRequest } from "../types.ts";
-import { ensureDir, readJsonFile, safeErrorMessage, sbomOutputPath, toSeverity } from "../utils.ts";
+import { ensureDir, readJsonFile, safeErrorMessage, sbomOutputPath, toSeverity } from "../../shared/utils.ts";
 
 interface TrivyReport {
   Results?: TrivyResult[];

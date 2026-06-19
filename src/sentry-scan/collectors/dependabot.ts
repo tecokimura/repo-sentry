@@ -6,7 +6,7 @@ import type {
   FindingStatus,
   ScanRequest,
 } from "../types.ts";
-import { toSeverity } from "../utils.ts";
+import { toSeverity } from "../../shared/utils.ts";
 
 const githubApiBase = "https://api.github.com";
 

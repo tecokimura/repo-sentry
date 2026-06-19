@@ -9,7 +9,7 @@ import type {
   ScanRequest,
   ToolName,
 } from "./types.ts";
-import { nowIso, summarizeSeverities } from "./utils.ts";
+import { nowIso, summarizeSeverities } from "../shared/utils.ts";
 
 export async function runScan(request: ScanRequest): Promise<ScanReport> {
   // Clearwing is a post-processing enrichment step, not a discovery collector.

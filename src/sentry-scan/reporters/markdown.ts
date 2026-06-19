@@ -1,6 +1,6 @@
 import type { CollectorRunStatus, CollectorStatus, Finding, ScanReport } from "../types.ts";
 import { severityOrder } from "../types.ts";
-import { writeTextFile } from "../utils.ts";
+import { writeTextFile } from "../../shared/utils.ts";
 
 export function renderMarkdownReport(report: ScanReport): string {
   const lines: string[] = [];

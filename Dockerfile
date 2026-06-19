@@ -49,7 +49,7 @@ WORKDIR /app
 COPY deno.json README.md ./
 COPY src/ ./src/
 
-RUN deno cache src/cli.ts
+RUN deno cache src/sentry-scan/cli.ts
 
 RUN mkdir -p /workspace/reports /workspace/.repo-sentry \
   && chown -R deno:deno /workspace /app
@@ -60,6 +60,6 @@ ENV TRIVY_CACHE_DIR=/workspace/.repo-sentry/trivy-cache
 WORKDIR /workspace
 USER deno
 
-ENTRYPOINT ["deno", "run", "--allow-read=/app,/workspace", "--allow-write=/workspace/reports,/workspace/.repo-sentry", "--allow-env=GITHUB_TOKEN,SLACK_WEBHOOK_URL,OPENAI_API_KEY,OPENAI_MODEL,CLEARWING_PROVIDER,DENO_DIR,TRIVY_CACHE_DIR,OLLAMA_HOST,OLLAMA_MODEL", "--allow-net=api.github.com,api.openai.com,host.docker.internal", "--allow-run=gitleaks,trivy", "/app/src/cli.ts"]
+ENTRYPOINT ["deno", "run", "--allow-read=/app,/workspace", "--allow-write=/workspace/reports,/workspace/.repo-sentry", "--allow-env=GITHUB_TOKEN,SLACK_WEBHOOK_URL,OPENAI_API_KEY,OPENAI_MODEL,CLEARWING_PROVIDER,DENO_DIR,TRIVY_CACHE_DIR,OLLAMA_HOST,OLLAMA_MODEL", "--allow-net=api.github.com,api.openai.com,host.docker.internal", "--allow-run=gitleaks,trivy", "/app/src/sentry-scan/cli.ts"]
 
 CMD ["--help"]

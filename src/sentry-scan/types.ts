@@ -1,11 +1,12 @@
+export type { Severity, SeveritySummary } from "../shared/types.ts";
+export { severityOrder, allSummary } from "../shared/types.ts";
+
 export type ToolName =
   | "gitleaks"
   | "trivy"
   | "dependabot"
   | "trufflehog"
   | "clearwing";
-
-export type Severity = "critical" | "high" | "medium" | "low" | "info" | "unknown";
 
 export type FindingCategory =
   | "secret"
@@ -38,6 +39,8 @@ export type EvidenceLevel =
 
 export type OutputFormat = "json" | "markdown";
 
+import type { Severity, SeveritySummary } from "../shared/types.ts"; // used by interfaces below
+
 export interface Finding {
   id?: string;
   tool: ToolName;
@@ -60,15 +63,6 @@ export interface Finding {
   evidenceLevel?: EvidenceLevel;
   rawReportPath?: string;
   raw?: unknown;
-}
-
-export interface SeveritySummary {
-  critical: number;
-  high: number;
-  medium: number;
-  low: number;
-  info: number;
-  unknown: number;
 }
 
 export interface CollectorStatus {
@@ -125,21 +119,3 @@ export interface CollectorResult {
   status: CollectorStatus;
   findings: Finding[];
 }
-
-export const severityOrder: Record<Severity, number> = {
-  unknown: 0,
-  info: 1,
-  low: 2,
-  medium: 3,
-  high: 4,
-  critical: 5,
-};
-
-export const allSummary = (): SeveritySummary => ({
-  critical: 0,
-  high: 0,
-  medium: 0,
-  low: 0,
-  info: 0,
-  unknown: 0,
-});

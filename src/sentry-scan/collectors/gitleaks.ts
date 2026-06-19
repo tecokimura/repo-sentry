@@ -1,6 +1,6 @@
 import { completeCollector, failCollector, startCollector } from "./common.ts";
 import type { CollectorResult, Finding, ScanRequest } from "../types.ts";
-import { ensureDir, readJsonFile, safeErrorMessage } from "../utils.ts";
+import { ensureDir, readJsonFile, safeErrorMessage } from "../../shared/utils.ts";
 
 interface GitleaksFinding {
   RuleID?: string;

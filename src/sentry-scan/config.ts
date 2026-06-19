@@ -1,5 +1,5 @@
 import type { OutputFormat, ScanRequest, Severity, ToolName } from "./types.ts";
-import { defaultArtifactsDir } from "./utils.ts";
+import { defaultArtifactsDir } from "../shared/utils.ts";
 
 export interface CliRunOptions {
   command: "run";

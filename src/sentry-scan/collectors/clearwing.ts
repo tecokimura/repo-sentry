@@ -1,6 +1,6 @@
 import { completeCollector, failCollector, startCollector } from "./common.ts";
 import type { CollectorStatus, Finding, ScanRequest } from "../types.ts";
-import { safeErrorMessage } from "../utils.ts";
+import { safeErrorMessage } from "../../shared/utils.ts";
 
 const DEFAULT_OLLAMA_HOST = "http://host.docker.internal:11434";
 export const DEFAULT_OLLAMA_MODEL = "llama3.2";

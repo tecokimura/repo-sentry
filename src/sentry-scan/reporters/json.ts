@@ -1,5 +1,5 @@
 import type { ScanReport } from "../types.ts";
-import { writeTextFile } from "../utils.ts";
+import { writeTextFile } from "../../shared/utils.ts";
 
 export function renderJsonReport(report: ScanReport): string {
   return `${JSON.stringify(report, null, 2)}\n`;

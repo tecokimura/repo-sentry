@@ -1,10 +1,10 @@
 {
   "tasks": {
-    "check": "deno check src/cli.ts",
+    "check": "deno check src/sentry-scan/cli.ts",
     "fmt": "deno fmt",
     "lint": "deno lint",
     "test": "deno test --allow-read --allow-write=./reports --allow-env=GITHUB_TOKEN --allow-net=api.github.com,host.docker.internal --allow-run=gitleaks,trivy",
-    "run": "deno run --allow-read --allow-write=./reports --allow-env=GITHUB_TOKEN --allow-net=api.github.com,host.docker.internal --allow-run=gitleaks,trivy src/cli.ts"
+    "run": "deno run --allow-read --allow-write=./reports --allow-env=GITHUB_TOKEN --allow-net=api.github.com,host.docker.internal --allow-run=gitleaks,trivy src/sentry-scan/cli.ts"
   },
   "fmt": {
     "lineWidth": 100,
