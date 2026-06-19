@@ -154,7 +154,7 @@ function buildPrompt(finding: Finding): string {
 
 制約:
 * 文章ではなく箇条書き・構造化形式のみで記載する
-* 推測や一般論を書かない。提供された情報から判断できる事実のみ記載する
+* 提供された情報から判断できる事実のみ記載する。推測・一般論は禁止
 * 不明な場合は項目を省略するか「不明」と書く
 * 各項目は指定された見出しのみを使うこと
 
@@ -165,17 +165,16 @@ ${description}
 以下の3項目を必ずこの形式で回答してください:
 
 【カテゴリ・影響】
-Category: <脆弱性の種類 例: XSS / SSRF / RCE / SQLi / Path Traversal / Auth Bypass / Validation Bypass / DoS / Header Injection / Deserialization>
-CWE: <CWE番号 例: CWE-79（不明なら省略）>
+Category: <以下から1つ選ぶ: RCE / XSS / SSRF / SQLi / DoS / Validation Bypass / Open Redirect / Auth Bypass / Info Disclosure / Command Injection / Header Injection / Path Traversal / Deserialization / Other>
+CWE: <入力情報（説明・CVE・GHSA）に明記されている場合のみ記載。例: CWE-79。不明なら省略>
 Impact:
 - <技術的影響 例: Session Hijacking / Credential Theft / Data Exfiltration / RCE / Bypass Access Control>
 
 【悪用条件】
-- <悪用に必要な設定・状態・前提条件 例: Debug Mode Enabled / Uses Temporary Signed URL / Publicly Accessible Endpoint>
+- <悪用に必要な設定・状態・前提条件 例: Debug Mode Enabled / Uses Temporary Signed URL / APP_DEBUG=true>
 
-【影響範囲】
-- UsesFeature: <影響を受ける可能性のある機能 例: File Upload / Email Sending / URL Redirect / Session Handling>
-- Config: <関連する設定 例: files.* / APP_DEBUG=true（該当なし・不明なら省略）>`;
+【影響機能】
+- <影響を受ける可能性のある機能・コンポーネント 例: File Upload / Email Sending / URL Redirect / Session Handling>`;
 }
 
 async function callChatCompletion(
@@ -225,6 +224,6 @@ function parseSections(
   return {
     clearwingRisk: extract("【カテゴリ・影響】"),
     clearwingIncidents: extract("【悪用条件】"),
-    clearwingMemo: extract("【影響範囲】"),
+    clearwingMemo: extract("【影響機能】"),
   };
 }

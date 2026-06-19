@@ -199,7 +199,7 @@ function renderFinding(finding: Finding): string {
   }
 
   if (finding.clearwingMemo) {
-    lines.push("#### 影響範囲");
+    lines.push("#### 影響機能");
     lines.push("");
     lines.push(finding.clearwingMemo);
     lines.push("");
