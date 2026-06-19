@@ -1,7 +1,7 @@
 import { collectDependabot } from "./collectors/dependabot.ts";
 import { collectGitleaks } from "./collectors/gitleaks.ts";
 import { collectTrivy } from "./collectors/trivy.ts";
-import { enrichWithClearwing } from "./collectors/clearwing.ts";
+import { DEFAULT_OLLAMA_MODEL, DEFAULT_OPENAI_MODEL, enrichWithClearwing } from "./collectors/clearwing.ts";
 import type {
   CollectorResult,
   CollectorStatus,
@@ -15,9 +15,10 @@ export async function runScan(request: ScanRequest): Promise<ScanReport> {
   // Clearwing is a post-processing enrichment step, not a discovery collector.
   // Run all other tools in parallel first, then enrich.
   const discoveryTools = request.tools.filter((t) => t !== "clearwing");
-  const collectorResults: CollectorResult[] = await Promise.all(
-    discoveryTools.map((tool) => runCollector(tool, request)),
-  );
+  const [collectorResults, toolVersions] = await Promise.all([
+    Promise.all(discoveryTools.map((tool) => runCollector(tool, request))),
+    fetchToolVersions(request.tools, request),
+  ]);
 
   let findings = collectorResults.flatMap((result) => result.findings);
   const collectorStatuses = collectorResults.map((result) => result.status);
@@ -32,10 +33,56 @@ export async function runScan(request: ScanRequest): Promise<ScanReport> {
     repository: request.repo,
     path: request.path,
     scannedAt: nowIso(),
+    toolVersions,
     summary: summarizeSeverities(findings),
     collectorStatuses,
     findings,
   };
+}
+
+async function fetchToolVersions(tools: ToolName[], request: ScanRequest): Promise<Record<string, string>> {
+  const versions: Record<string, string> = {};
+  const checks: Promise<void>[] = [];
+
+  if (tools.includes("gitleaks")) {
+    checks.push((async () => {
+      try {
+        const { stdout } = await new Deno.Command("gitleaks", {
+          args: ["version"],
+          stdout: "piped",
+          stderr: "null",
+        }).output();
+        const v = new TextDecoder().decode(stdout).trim().replace(/^v/, "");
+        if (v) versions["gitleaks"] = v;
+      } catch { /* ignore */ }
+    })());
+  }
+
+  if (tools.includes("trivy")) {
+    checks.push((async () => {
+      try {
+        const { stdout } = await new Deno.Command("trivy", {
+          args: ["--version"],
+          stdout: "piped",
+          stderr: "null",
+        }).output();
+        const match = new TextDecoder().decode(stdout).match(/Version:\s*(\S+)/);
+        if (match) versions["trivy"] = match[1];
+      } catch { /* ignore */ }
+    })());
+  }
+
+  if (tools.includes("clearwing")) {
+    const apiKey = request.clearwing?.openaiApiKey;
+    const provider = request.clearwing?.provider ?? (apiKey ? "openai" : "ollama");
+    const model = provider === "openai"
+      ? (request.clearwing?.openaiModel ?? DEFAULT_OPENAI_MODEL)
+      : (request.clearwing?.ollamaModel ?? DEFAULT_OLLAMA_MODEL);
+    versions["clearwing"] = `${provider}/${model}`;
+  }
+
+  await Promise.all(checks);
+  return versions;
 }
 
 async function runCollector(tool: ToolName, request: ScanRequest): Promise<CollectorResult> {

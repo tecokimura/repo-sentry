@@ -87,6 +87,7 @@ export interface ScanReport {
   repository?: string;
   path?: string;
   scannedAt: string;
+  toolVersions?: Record<string, string>;
   summary: SeveritySummary;
   collectorStatuses: CollectorStatus[];
   findings: Finding[];

@@ -15,6 +15,10 @@ export function renderMarkdownReport(report: ScanReport): string {
   } else if (report.path && report.path !== ".") {
     lines.push(`Scan target: ${report.path}`);
   }
+  const toolVersionEntries = Object.entries(report.toolVersions ?? {});
+  if (toolVersionEntries.length > 0) {
+    lines.push(`Tools: ${toolVersionEntries.map(([t, v]) => `${t} ${v}`).join(", ")}`);
+  }
   lines.push("");
 
   lines.push("## 対応優先度サマリー");

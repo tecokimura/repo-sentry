@@ -3,9 +3,9 @@ import type { CollectorStatus, Finding, ScanRequest } from "../types.ts";
 import { safeErrorMessage } from "../utils.ts";
 
 const DEFAULT_OLLAMA_HOST = "http://host.docker.internal:11434";
-const DEFAULT_OLLAMA_MODEL = "llama3.2";
+export const DEFAULT_OLLAMA_MODEL = "llama3.2";
 const DEFAULT_OPENAI_HOST = "https://api.openai.com";
-const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
+export const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
 
 export interface ClearwingResult {
   status: CollectorStatus;
