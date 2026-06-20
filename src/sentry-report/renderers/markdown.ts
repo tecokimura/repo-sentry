@@ -1,5 +1,6 @@
 import type { ReportPlan, PlanAction, PlanDeferral } from "../plan.ts";
 import type { ReportInput, ReportFinding } from "../types.ts";
+import { filterAvailableVersions } from "../semver.ts";
 
 export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): string {
   const lines: string[] = [];
@@ -91,7 +92,7 @@ export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): stri
   if (fixable.length > 0) {
     lines.push("## 修正ガイド");
     lines.push("");
-    lines.push("| パッケージ | 現在バージョン | 修正バージョン | 修正コマンド |");
+    lines.push("| パッケージ | 現在バージョン | 推奨バージョン | 修正コマンド |");
     lines.push("| --- | --- | --- | --- |");
     const seen = new Set<string>();
     for (const f of fixable) {
@@ -100,9 +101,10 @@ export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): stri
       seen.add(key);
       const pkg = f.package?.name ?? "—";
       const cur = f.package?.version ?? "—";
-      const fixed = f.recommendedAction.fixedVersions?.join(", ") ?? "—";
-      const cmd = f.recommendedAction.command ? `\`${escMd(f.recommendedAction.command)}\`` : "—";
-      lines.push(`| ${escMd(pkg)} | ${escMd(cur)} | ${escMd(fixed)} | ${cmd} |`);
+      const rec = f.recommendedAction.recommendedVersion ?? "—";
+      const rawCmd = f.recommendedAction.fixCommand ?? f.recommendedAction.command;
+      const cmd = rawCmd ? `\`${escMd(rawCmd)}\`` : "—";
+      lines.push(`| ${escMd(pkg)} | ${escMd(cur)} | ${escMd(rec)} | ${cmd} |`);
     }
     lines.push("");
   }
@@ -222,8 +224,17 @@ function renderFindingTable(f: ReportFinding): string[] {
     rows.push(["現在バージョン", f.package.version]);
     if (f.package.purl) rows.push(["PURL", f.package.purl]);
   }
+  if (f.recommendedAction.recommendedVersion) {
+    rows.push(["推奨修正版", `**${f.recommendedAction.recommendedVersion}**`]);
+  }
   if (f.recommendedAction.fixedVersions?.length) {
-    rows.push(["修正バージョン", f.recommendedAction.fixedVersions.join(", ")]);
+    const available = filterAvailableVersions(
+      f.recommendedAction.fixedVersions,
+      f.package?.version,
+    );
+    if (available.length > 0) {
+      rows.push(["利用可能", available.join(", ")]);
+    }
   }
   if (f.riskSignals.epss != null) {
     rows.push(["EPSS", `${(f.riskSignals.epss * 100).toFixed(1)}% (${

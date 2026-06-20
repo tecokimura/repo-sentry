@@ -8,6 +8,7 @@ import type {
   RiskSignals,
 } from "./types.ts";
 import { REPORT_INPUT_VERSION } from "./types.ts";
+import { computeRecommendedVersion } from "./semver.ts";
 
 export function buildReportInput(report: EnrichedReport): ReportInput {
   const findings = report.findings.map(toReportFinding);
@@ -85,9 +86,35 @@ function deriveAction(f: EnrichedFinding, fixAvailable: boolean): RecommendedAct
   const action = fixAvailable ? "upgrade" : f.clearwingMemo ? "mitigate" : "monitor";
 
   const result: RecommendedAction = { action, urgency, fixAvailable };
-  if (f.fixedVersions?.length) result.fixedVersions = f.fixedVersions;
+  if (f.fixedVersions?.length) {
+    result.fixedVersions = f.fixedVersions;
+    const rec = computeRecommendedVersion(f.packageVersion, f.fixedVersions);
+    if (rec) {
+      result.recommendedVersion = rec;
+      result.fixCommand = generateFixCommand(f.ecosystem, f.packageName, rec);
+    }
+  }
 
   return result;
+}
+
+function generateFixCommand(
+  ecosystem?: string,
+  pkgName?: string,
+  version?: string,
+): string | undefined {
+  if (!ecosystem || !pkgName || !version) return undefined;
+  switch (ecosystem) {
+    case "composer": return `composer require ${pkgName}:^${version}`;
+    case "npm":      return `npm install ${pkgName}@${version}`;
+    case "pypi":     return `pip install ${pkgName}==${version}`;
+    case "golang":   return `go get ${pkgName}@v${version}`;
+    case "cargo":    return `cargo add ${pkgName}@${version}`;
+    case "gem":      return `gem install ${pkgName} -v ${version}`;
+    case "nuget":    return `dotnet add package ${pkgName} --version ${version}`;
+    case "maven":    return `<!-- pom.xml: <version>${version}</version> -->`;
+    default:         return undefined;
+  }
 }
 
 function deriveUrgency(f: EnrichedFinding): "immediate" | "planned" | "deferred" {

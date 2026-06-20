@@ -25,6 +25,8 @@ export interface RecommendedAction {
   urgency: ReportUrgency;
   fixAvailable: boolean;
   fixedVersions?: string[];
+  recommendedVersion?: string;
+  fixCommand?: string;
   command?: string;
 }
 
