@@ -23,10 +23,10 @@ export async function generateReportPlan(
   const provider = config.provider ?? (config.openaiApiKey ? "openai" : "ollama");
   const host = provider === "openai"
     ? DEFAULT_OPENAI_HOST
-    : (config.ollamaHost ?? DEFAULT_OLLAMA_HOST);
+    : (config.ollamaHost || DEFAULT_OLLAMA_HOST);
   const model = provider === "openai"
-    ? (config.openaiModel ?? DEFAULT_OPENAI_MODEL)
-    : (config.ollamaModel ?? DEFAULT_OLLAMA_MODEL);
+    ? (config.openaiModel || DEFAULT_OPENAI_MODEL)
+    : (config.ollamaModel || DEFAULT_OLLAMA_MODEL);
 
   if (provider === "openai" && !config.openaiApiKey) {
     throw new Error("OPENAI_API_KEY が設定されていません");
