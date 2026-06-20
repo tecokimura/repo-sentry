@@ -121,9 +121,16 @@ if [[ "$DEBUG" == "true" ]]; then
   _debug_args=(--debug-input "$_container_debug")
 fi
 
+# .envファイルがあればコンテナに渡す（シェル変数が優先される）
+_env_file_args=()
+if [[ -f "${ENV_FILE:-.env}" ]]; then
+  _env_file_args=(--env-file "${ENV_FILE:-.env}")
+fi
+
 _exit=0
 docker run --rm \
   --user "$DOCKER_USER" \
+  ${_env_file_args[@]+"${_env_file_args[@]}"} \
   -e DENO_DIR=/workspace/.repo-sentry/deno-cache \
   -e OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
   -e REPORT_LLM_PROVIDER="${REPORT_LLM_PROVIDER:-${CLEARWING_PROVIDER:-}}" \

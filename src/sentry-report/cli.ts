@@ -53,16 +53,16 @@ function parseArgs(args: string[]): ReportRequest {
   req.planner.openaiApiKey = Deno.env.get("OPENAI_API_KEY");
   // REPORT_LLM_PROVIDER が優先。未設定時は CLEARWING_PROVIDER にフォールバック
   if (!req.planner.provider) {
-    const p = Deno.env.get("REPORT_LLM_PROVIDER") ?? Deno.env.get("CLEARWING_PROVIDER");
+    const p = Deno.env.get("REPORT_LLM_PROVIDER") || Deno.env.get("CLEARWING_PROVIDER");
     if (p) req.planner.provider = p as "openai" | "ollama";
   }
   // REPORT_LLM_MODEL が優先。未設定時は OLLAMA_MODEL にフォールバック
   if (!req.planner.ollamaModel) {
-    req.planner.ollamaModel = Deno.env.get("REPORT_LLM_MODEL") ?? Deno.env.get("OLLAMA_MODEL");
+    req.planner.ollamaModel = Deno.env.get("REPORT_LLM_MODEL") || Deno.env.get("OLLAMA_MODEL");
   }
   // OLLAMA_BASE_URL が優先。未設定時は OLLAMA_HOST にフォールバック
   if (!req.planner.ollamaHost) {
-    req.planner.ollamaHost = Deno.env.get("OLLAMA_BASE_URL") ?? Deno.env.get("OLLAMA_HOST");
+    req.planner.ollamaHost = Deno.env.get("OLLAMA_BASE_URL") || Deno.env.get("OLLAMA_HOST");
   }
 
   if (!req.input) throw new Error("--input is required");
