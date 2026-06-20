@@ -532,6 +532,72 @@ JSON レポートは次のような形です。
 }
 ```
 
+---
+
+## sentry-report: AI レポート生成（Phase 3）
+
+`docker-enrich.sh` で生成した `enriched_*.json` をもとに、AI が分析して Markdown レポートを生成します。
+
+```bash
+./scripts/docker-report.sh reports/MYAPP-main/enriched_myapp_A3F2260612.json
+```
+
+生成ファイル:
+
+```text
+reports/
+  MYAPP-main/
+    report_myapp_A3F2260612-plan.json   ← AI が生成した ReportPlan（監査用）
+    report_myapp_A3F2260612.md          ← Markdown レポート
+```
+
+`--debug` を付けると `report-input.json`（変換後の中間データ）も保存されます。
+
+### LLM プロバイダーの設定
+
+```bash
+# OpenAI を使う場合
+REPORT_LLM_PROVIDER=openai \
+OPENAI_API_KEY=sk-... \
+./scripts/docker-report.sh enriched.json
+
+# Ollama（ローカル）を使う場合
+REPORT_LLM_PROVIDER=ollama \
+REPORT_LLM_MODEL=qwen2.5:7b \
+./scripts/docker-report.sh enriched.json
+```
+
+| 環境変数 | 既定値 | 説明 |
+| --- | --- | --- |
+| `REPORT_LLM_PROVIDER` | 自動判定 | `openai` または `ollama`（`CLEARWING_PROVIDER` でも可） |
+| `OPENAI_API_KEY` | — | OpenAI API キー |
+| `REPORT_LLM_MODEL` | `qwen2.5:7b` / `gpt-4o-mini` | LLM モデル名（`OLLAMA_MODEL` でも可） |
+| `OLLAMA_BASE_URL` | `http://host.docker.internal:11434` | Ollama ホスト（`OLLAMA_HOST` でも可） |
+
+### AI の責務分離
+
+AI（`ReportPlan`）が担当する内容:
+- 総評（executiveSummary）・全体リスク評価
+- 各 finding の対応理由・後回し理由
+
+Renderer（`ReportInput` から直接）が担当する内容:
+- CVE ID・パッケージ名・バージョン・修正コマンド
+- EPSS スコア・KEV 情報・CWE
+- 付録の全 Finding 一覧
+
+→ AI が修正コマンドやバージョンを捏造するリスクを排除しています。
+
+### docker-report.sh オプション
+
+| オプション | 説明 |
+| --- | --- |
+| `ENRICHED_JSON` | 対象の `enriched_*.json` ファイルパス（必須） |
+| `--output PATH` | `report.md` の出力パス（省略時は入力と同ディレクトリに自動生成） |
+| `--plan-output PATH` | `report-plan.json` の出力パス |
+| `--debug` | `report-input.json` も保存（デバッグ用） |
+
+---
+
 ## 終了コード
 
 | 終了コード | 意味                                     |
@@ -615,10 +681,16 @@ Ollama 使用時、Mac の Docker は Apple Silicon GPU（Metal）が使えな�
 - EPSS スコア取得
 - SBOM による direct/transitive 判定
 
+**sentry-report（Phase 3）**: 実装中
+
+- ReportInput スキーマ・priorityScore 自動計算
+- AI による ReportPlan 生成（OpenAI / Ollama）
+- Markdown レポート生成（AI 文章 + 機械データの分離）
+
 未実装または後続予定:
 
 - ExploitDB 連携
-- sentry-report（Phase 3）
+- sentry-export（PDF 生成）
 - Slack reporter
 - TruffleHog collector
 - 複数 repository の一括実行

@@ -408,6 +408,6 @@ OpenAI（デフォルト）または Ollama を選択可能（Phase 1・2 と同
 | 2 | sentry-enrich: OSV / KEV / EPSS 連携 | 完了 |
 | 3 | sentry-enrich: ExploitDB 連携 | 未着手 |
 | 4 | sentry-report: ReportInput / ReportPlan スキーマ設計 | 完了 |
-| 5 | sentry-report: Markdown 生成 | 実装中 |
-| 6 | sentry-report: PDF 生成（sentry-export として分離） | 未着手 |
+| 5 | sentry-report: Markdown 生成・Docker 実行環境 | 実装中 |
+| 6 | sentry-export: PDF 生成（別ツールとして分離） | 未着手 |
 | 6 | 運用改善（差分比較・履歴管理・Slack 通知・チケット自動起票） | 未着手 |

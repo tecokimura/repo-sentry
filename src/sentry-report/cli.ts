@@ -51,14 +51,18 @@ function parseArgs(args: string[]): ReportRequest {
   }
 
   req.planner.openaiApiKey = Deno.env.get("OPENAI_API_KEY");
-  if (!req.planner.provider && Deno.env.get("CLEARWING_PROVIDER")) {
-    req.planner.provider = Deno.env.get("CLEARWING_PROVIDER") as "openai" | "ollama";
+  // REPORT_LLM_PROVIDER が優先。未設定時は CLEARWING_PROVIDER にフォールバック
+  if (!req.planner.provider) {
+    const p = Deno.env.get("REPORT_LLM_PROVIDER") ?? Deno.env.get("CLEARWING_PROVIDER");
+    if (p) req.planner.provider = p as "openai" | "ollama";
   }
-  if (!req.planner.ollamaModel && Deno.env.get("OLLAMA_MODEL")) {
-    req.planner.ollamaModel = Deno.env.get("OLLAMA_MODEL");
+  // REPORT_LLM_MODEL が優先。未設定時は OLLAMA_MODEL にフォールバック
+  if (!req.planner.ollamaModel) {
+    req.planner.ollamaModel = Deno.env.get("REPORT_LLM_MODEL") ?? Deno.env.get("OLLAMA_MODEL");
   }
-  if (!req.planner.ollamaHost && Deno.env.get("OLLAMA_HOST")) {
-    req.planner.ollamaHost = Deno.env.get("OLLAMA_HOST");
+  // OLLAMA_BASE_URL が優先。未設定時は OLLAMA_HOST にフォールバック
+  if (!req.planner.ollamaHost) {
+    req.planner.ollamaHost = Deno.env.get("OLLAMA_BASE_URL") ?? Deno.env.get("OLLAMA_HOST");
   }
 
   if (!req.input) throw new Error("--input is required");
@@ -84,9 +88,9 @@ Options:
 
 Environment variables:
   OPENAI_API_KEY               OpenAI API key
-  CLEARWING_PROVIDER           LLM provider (openai or ollama)
-  OLLAMA_MODEL                 Ollama model name
-  OLLAMA_HOST                  Ollama host URL
+  REPORT_LLM_PROVIDER          LLM provider: openai or ollama (CLEARWING_PROVIDER as fallback)
+  REPORT_LLM_MODEL             Ollama model (OLLAMA_MODEL as fallback)
+  OLLAMA_BASE_URL              Ollama host URL (OLLAMA_HOST as fallback)
 `;
 }
 
