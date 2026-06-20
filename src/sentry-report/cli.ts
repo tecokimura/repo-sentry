@@ -34,6 +34,8 @@ function parseArgs(args: string[]): ReportRequest {
 
     if (arg === "--input" || arg === "-i")           { req.input = next(); }
     else if (arg.startsWith("--input="))             { req.input = val("--input="); }
+    else if (arg === "--plan-input")                  { req.planInput = next(); }
+    else if (arg.startsWith("--plan-input="))        { req.planInput = val("--plan-input="); }
     else if (arg === "--output" || arg === "-o")      { req.reportOutput = next(); }
     else if (arg.startsWith("--output="))            { req.reportOutput = val("--output="); }
     else if (arg === "--plan-output")                 { req.planOutput = next(); }
@@ -78,6 +80,7 @@ Usage:
 Options:
   --input PATH, -i PATH        Input enriched JSON file (required)
   --output PATH, -o PATH       Output report.md path. Prints to stdout when omitted
+  --plan-input PATH            既存の report-plan.json を再利用（AI 呼び出しをスキップ）
   --plan-output PATH           Output report-plan.json path
   --debug-input PATH           Save report-input.json (debug)
   --provider openai|ollama     LLM provider (default: auto-detect)

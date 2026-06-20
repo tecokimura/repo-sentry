@@ -9,6 +9,7 @@ import { readJsonFile, writeTextFile } from "../shared/utils.ts";
 
 export interface ReportRequest {
   input: string;
+  planInput?: string;   // 指定時は AI 呼び出しをスキップして既存 plan を使用
   planOutput?: string;
   reportOutput?: string;
   debugInputOutput?: string;
@@ -31,7 +32,13 @@ export async function runReport(request: ReportRequest): Promise<ReportResult> {
     console.error(`[sentry-report] debug: report-input → ${request.debugInputOutput}`);
   }
 
-  const plan = await generateReportPlan(reportInput, request.planner);
+  let plan: ReportPlan;
+  if (request.planInput) {
+    plan = await readJsonFile(request.planInput) as ReportPlan;
+    console.error(`[sentry-report] plan     ← ${request.planInput} (再利用)`);
+  } else {
+    plan = await generateReportPlan(reportInput, request.planner);
+  }
 
   if (request.planOutput) {
     await writeTextFile(request.planOutput, JSON.stringify(plan, null, 2));

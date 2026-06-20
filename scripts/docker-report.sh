@@ -14,6 +14,7 @@ Arguments:
 
 Options:
   --output PATH         report.md の出力パス (default: 入力と同じディレクトリに report_... を生成)
+  --plan-input PATH     既存の report-plan.json を再利用（AI 呼び出しをスキップ）
   --plan-output PATH    report-plan.json の出力パス (default: 同ディレクトリに自動生成)
   --debug               report-input.json も保存する
   -h, --help            このヘルプを表示
@@ -34,6 +35,7 @@ DOCKER_USER="${DOCKER_USER:-$(id -u):$(id -g)}"
 
 INPUT_FILE=""
 OUTPUT_FILE=""
+PLAN_INPUT_FILE=""
 PLAN_FILE=""
 DEBUG=false
 
@@ -42,6 +44,8 @@ while [[ $# -gt 0 ]]; do
     -h|--help)    usage; exit 0 ;;
     --output)     OUTPUT_FILE="$2"; shift 2 ;;
     --output=*)   OUTPUT_FILE="${1#*=}"; shift ;;
+    --plan-input)  PLAN_INPUT_FILE="$2"; shift 2 ;;
+    --plan-input=*) PLAN_INPUT_FILE="${1#*=}"; shift ;;
     --plan-output)  PLAN_FILE="$2"; shift 2 ;;
     --plan-output=*) PLAN_FILE="${1#*=}"; shift ;;
     --debug)      DEBUG=true; shift ;;
@@ -121,6 +125,16 @@ if [[ "$DEBUG" == "true" ]]; then
   _debug_args=(--debug-input "$_container_debug")
 fi
 
+# --plan-input オプション
+_plan_input_args=()
+if [[ -n "$PLAN_INPUT_FILE" ]]; then
+  PLAN_INPUT_FILE="$(cd "$(dirname "$PLAN_INPUT_FILE")" && pwd -P)/$(basename "$PLAN_INPUT_FILE")"
+  if [[ "$PLAN_INPUT_FILE" != "${_reports_dir}/"* ]]; then
+    echo "エラー: --plan-input ファイルが REPORTS_DIR の外にあります。" >&2; exit 2
+  fi
+  _plan_input_args=(--plan-input "/workspace/reports/${PLAN_INPUT_FILE#${_reports_dir}/}")
+fi
+
 # .envファイルがあればコンテナに渡す（シェル変数が優先される）
 _env_file_args=()
 if [[ -f "${ENV_FILE:-.env}" ]]; then
@@ -143,6 +157,7 @@ docker run --rm \
   --input "$_container_input" \
   --output "$_container_output" \
   --plan-output "$_container_plan" \
+  ${_plan_input_args[@]+"${_plan_input_args[@]}"} \
   ${_debug_args[@]+"${_debug_args[@]}"} || _exit=$?
 
 _elapsed=$(( SECONDS - _START_SECONDS ))
