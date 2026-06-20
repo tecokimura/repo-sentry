@@ -54,7 +54,9 @@ export interface Finding {
   identifiers?: string[];
   packageName?: string;
   packageVersion?: string;
-  fixedVersion?: string;
+  ecosystem?: string;
+  purl?: string;
+  fixedVersions?: string[];
   cweIds?: string[];
   clearwingRisk?: string;
   clearwingIncidents?: string;

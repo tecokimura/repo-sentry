@@ -55,15 +55,17 @@ echo "exit: $?"
 
 3. レポートを確認します。
 
-```text
-reports/YYYYMMDD-HHMM_repo-sentry-scan.md
-```
-
-例:
+出力先は `reports/{プロジェクト名}/` ディレクトリです。
 
 ```text
-reports/20260618-1423_repo-sentry-scan.md
+reports/
+  MYAPP-main/
+    scan_myapp_A3F2260612.md       ← Markdown レポート
+    scan_myapp_A3F2260612.json     ← JSON（sentry-enrich の入力に使用）
+    scan_myapp_A3F2260612.sbom.cdx.json
 ```
+
+ファイル名の構成: `scan_{short}_{HASH}{YYMMDDHH}[_{suffix}].{ext}`
 
 ## 設定ファイル（.env）
 
@@ -99,6 +101,57 @@ OLLAMA_MODEL=qwen2.5:7b
 ```
 
 `.env` は `.gitignore` に含まれているため、誤ってコミットされることはありません。
+
+---
+
+## sentry-enrich: 外部 DB エンリッチ（Phase 2）
+
+`docker-scan.sh` で生成した `scan_*.json` を、外部脆弱性データベースで補強します。
+
+```bash
+./scripts/docker-enrich.sh reports/MYAPP-main/scan_myapp_A3F2260612.json
+```
+
+エンリッチ完了後、同じディレクトリに `enriched_*.json` が生成されます。
+
+```text
+reports/
+  MYAPP-main/
+    scan_myapp_A3F2260612.json
+    enriched_myapp_A3F2260612.json   ← 追加情報付き
+```
+
+### 追加される情報
+
+| フィールド | ソース | 内容 |
+| --- | --- | --- |
+| `osv` | [OSV](https://osv.dev/) | 脆弱性詳細・aliases・summary |
+| `kev` | [CISA KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) | 実際に悪用されているか（dateAdded など） |
+| `epss` | [FIRST EPSS](https://www.first.org/epss/) | 今後悪用される可能性スコア（0.0〜1.0） |
+| `dependencyType` | SBOM | `direct` または `transitive`（SBOM 指定時のみ） |
+
+### docker-enrich.sh オプション
+
+| オプション | 説明 |
+| --- | --- |
+| `SCAN_JSON` | エンリッチ対象の `scan_*.json` ファイルパス（必須） |
+| `--output PATH` | 出力ファイルパス（省略時は入力と同じディレクトリ） |
+| `--sbom PATH` | CycloneDX SBOM（`direct`/`transitive` 判定用） |
+
+### sentry-enrich image の build
+
+`docker-build.sh` はスキャン用と enrich 用の両方を build します。
+
+```bash
+./scripts/docker-build.sh   # 両方を build（scan + enrich）
+```
+
+個別に build する場合:
+
+```bash
+./scripts/docker-build-scan.sh    # repo-sentry-scan:local
+./scripts/docker-build-enrich.sh  # repo-sentry-enrich:local
+```
 
 ---
 
@@ -404,7 +457,7 @@ deno run \
   --allow-env=GITHUB_TOKEN \
   --allow-net=api.github.com \
   --allow-run=gitleaks,trivy \
-  src/cli.ts run \
+  src/sentry-scan/cli.ts run \
   --path ./target-repo \
   --repo owner/name \
   --tools gitleaks,trivy,dependabot \
@@ -440,9 +493,11 @@ JSON レポートは次のような形です。
 
 ```json
 {
+  "scanId": "550e8400-e29b-41d4-a716-446655440000",
+  "profile": "base",
   "repository": "owner/name",
   "path": "/workspace/target",
-  "scannedAt": "2026-06-08T00:00:00.000Z",
+  "scannedAt": "2026-06-12T00:00:00.000Z",
   "summary": {
     "critical": 0,
     "high": 1,
@@ -453,14 +508,27 @@ JSON レポートは次のような形です。
   },
   "collectorStatuses": [
     {
-      "tool": "dependabot",
+      "tool": "trivy",
       "status": "completed",
-      "sourceStatus": "enabled_no_alerts",
-      "findingsCount": 0,
+      "findingsCount": 1,
       "notes": []
     }
   ],
-  "findings": []
+  "findings": [
+    {
+      "tool": "trivy",
+      "category": "dependency-vulnerability",
+      "severity": "high",
+      "title": "CVE-2024-1234 in example/package",
+      "packageName": "example/package",
+      "packageVersion": "1.2.3",
+      "ecosystem": "composer",
+      "purl": "pkg:composer/example/package@1.2.3",
+      "fixedVersions": ["1.2.4", "2.0.0"],
+      "identifiers": ["CVE-2024-1234"],
+      "status": "open"
+    }
+  ]
 }
 ```
 
@@ -527,12 +595,12 @@ Ollama 使用時、Mac の Docker は Apple Silicon GPU（Metal）が使えな�
 
 ## 現在の実装状態
 
-利用可能:
+**sentry-scan（Phase 1）**: 完了
 
 - Docker build / Docker scan
 - Deno CLI
 - gitleaks collector
-- Trivy collector
+- Trivy collector（ecosystem・purl・fixedVersions 付与）
 - Dependabot alerts collector
 - Clearwing collector（Ollama / OpenAI による LLM 分析）
 - JSON reporter
@@ -540,8 +608,17 @@ Ollama 使用時、Mac の Docker は Apple Silicon GPU（Metal）が使えな�
 - CycloneDX SBOM 生成（デフォルト有効、`--no-sbom` で無効化）
 - fixture ベースの tests
 
+**sentry-enrich（Phase 2）**: 実装中
+
+- OSV データベース連携
+- CISA KEV 連携（既知悪用脆弱性判定）
+- EPSS スコア取得
+- SBOM による direct/transitive 判定
+
 未実装または後続予定:
 
+- ExploitDB 連携
+- sentry-report（Phase 3）
 - Slack reporter
 - TruffleHog collector
 - 複数 repository の一括実行
@@ -553,7 +630,7 @@ Ollama 使用時、Mac の Docker は Apple Silicon GPU（Metal）が使えな�
 
 ```bash
 deno fmt
-deno check src/cli.ts
+deno check src/sentry-scan/cli.ts src/sentry-enrich/cli.ts
 deno lint
 deno test
 ```

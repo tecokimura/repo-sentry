@@ -142,7 +142,7 @@ function renderFinding(finding: Finding): string {
   const lines: string[] = [];
   const { best: bestFix, others: altFixes } = resolveFixVersions(
     finding.packageVersion,
-    finding.fixedVersion,
+    finding.fixedVersions,
   );
 
   lines.push(`### [${finding.severity.toUpperCase()}] ${escapeMarkdown(finding.title)}`);
@@ -213,7 +213,9 @@ function remedyCommand(finding: Finding, targetVersion: string | undefined): str
 
   const loc = (location ?? "").toLowerCase();
   const colonIdx = packageName.indexOf(":");
-  const eco = colonIdx >= 0 ? packageName.slice(0, colonIdx) : detectEcosystem(loc);
+  const eco = colonIdx >= 0
+    ? packageName.slice(0, colonIdx)
+    : (finding.ecosystem || detectEcosystem(loc));
   const pkg = colonIdx >= 0 ? packageName.slice(colonIdx + 1) : packageName;
 
   switch (eco) {
@@ -241,11 +243,11 @@ function remedyCommand(finding: Finding, targetVersion: string | undefined): str
 
 function resolveFixVersions(
   currentVersion?: string,
-  fixedVersion?: string,
+  fixedVersions?: string[],
 ): { best: string | undefined; others: string[] } {
-  if (!fixedVersion) return { best: undefined, others: [] };
+  if (!fixedVersions || fixedVersions.length === 0) return { best: undefined, others: [] };
 
-  const all = fixedVersion.split(",").map((v) => v.trim()).filter(Boolean);
+  const all = fixedVersions;
   if (all.length === 0) return { best: undefined, others: [] };
   if (!currentVersion || all.length === 1) {
     return { best: all.sort(compareSemver)[0], others: [] };

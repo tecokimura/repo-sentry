@@ -204,6 +204,10 @@ function normalizeVulnerability(
   const title = vulnerability.Title ??
     `${vulnerability.VulnerabilityID ?? "Vulnerability"} in ${vulnerability.PkgName ?? "package"}`;
 
+  const ecosystem = trivyTypeToEcosystem(result.Type);
+  const purl = buildPurl(ecosystem, vulnerability.PkgName, vulnerability.InstalledVersion);
+  const fixedVersions = splitFixedVersions(vulnerability.FixedVersion);
+
   return {
     id: vulnerability.VulnerabilityID,
     tool: "trivy",
@@ -219,7 +223,9 @@ function normalizeVulnerability(
     identifiers: vulnerability.VulnerabilityID ? [vulnerability.VulnerabilityID] : [],
     packageName: vulnerability.PkgName,
     packageVersion: vulnerability.InstalledVersion,
-    fixedVersion: vulnerability.FixedVersion,
+    ecosystem: ecosystem || undefined,
+    purl: purl || undefined,
+    fixedVersions: fixedVersions.length > 0 ? fixedVersions : undefined,
     cweIds: vulnerability.CweIDs?.length ? vulnerability.CweIDs : undefined,
     rawReportPath,
     raw: {
@@ -227,6 +233,31 @@ function normalizeVulnerability(
       type: result.Type,
     },
   };
+}
+
+function trivyTypeToEcosystem(type: string | undefined): string {
+  switch (type) {
+    case "composer": return "composer";
+    case "npm": case "yarn": case "node-pkg": return "npm";
+    case "pip": case "pipenv": case "poetry": return "pypi";
+    case "gomod": case "gobinary": return "golang";
+    case "cargo": return "cargo";
+    case "gem": return "gem";
+    case "nuget": return "nuget";
+    case "maven": case "gradle": return "maven";
+    default: return "";
+  }
+}
+
+function buildPurl(ecosystem: string, pkgName?: string, version?: string): string {
+  if (!ecosystem || !pkgName) return "";
+  const ver = version?.replace(/^[vV]/, "");
+  return ver ? `pkg:${ecosystem}/${pkgName}@${ver}` : `pkg:${ecosystem}/${pkgName}`;
+}
+
+function splitFixedVersions(fixedVersion?: string): string[] {
+  if (!fixedVersion) return [];
+  return fixedVersion.split(",").map((v) => v.trim()).filter(Boolean);
 }
 
 function normalizeMisconfiguration(

@@ -1,6 +1,6 @@
 # repo-sentry ロードマップ
 
-最終更新: 2026-06-19
+最終更新: 2026-06-20
 
 ---
 
@@ -20,22 +20,25 @@ repo-sentry/
       collectors/
       reporters/
     sentry-enrich/    Phase 2 固有コード
-      main.ts
+      cli.ts
       enrichers/
       reporters/
     sentry-report/    Phase 3 固有コード
-      main.ts
+      cli.ts
       reporters/
-  Dockerfile.scan
-  Dockerfile.enrich
-  Dockerfile.report
+  Dockerfile          sentry-scan 用
+  Dockerfile.enrich   sentry-enrich 用
+  Dockerfile.report   sentry-report 用（未実装）
   deno.json           ルートに1つ（Denoキャッシュ共有）
   docs/
   scripts/
+    docker-build.sh           両 image を一括 build
+    docker-build-scan.sh      sentry-scan image build
+    docker-build-enrich.sh    sentry-enrich image build
     docker-scan.sh
     docker-scan-clearwing.sh
     docker-enrich.sh
-    docker-report.sh
+    docker-report.sh          （未実装）
 ```
 
 ### 出力ファイル構成
@@ -101,7 +104,7 @@ sentry-scan
 
 **目的**: 脆弱性の事実データを生成する。解釈・優先順位付けは行わない。
 
-**進捗**: 約95%
+**進捗**: 完了
 
 ### 実装済み
 
@@ -111,6 +114,7 @@ sentry-scan
 - CycloneDX SBOM 生成
 - Vulnerabilities / GHSA / CVE 取得
 - CWE 取得（DB由来のみ、LLM生成禁止）
+- ecosystem / purl / fixedVersions フィールド生成
 - 推奨バージョン・対応コマンド生成
 - Scan metadata / status / DB更新日時
 - Clearwing 分析（Category / Impact / Affected Features）
@@ -118,9 +122,9 @@ sentry-scan
 - ツールバージョン記録
 - ファイル命名規則の統一
 
-### 残タスク（優先度低）
+### 残タスク
 
-- Direct / Transitive Dependency の区別（Phase 2 で SBOM から判定予定）
+なし（Direct / Transitive 判定は Phase 2 で SBOM から取得）
 
 ### 出力ファイル
 
@@ -169,33 +173,45 @@ LLM: OpenAI（デフォルト）または Ollama を選択可能。
 
 **目的**: Phase 1 の scan.json を外部脆弱性データベースで補強する。
 
-**進捗**: 未着手
+**進捗**: 実装中（約60〜70%）
 
-### 取得対象
+### 実装済み
 
-| ソース | 取得内容 |
+| ソース | 取得内容 | 備考 |
+| --- | --- | --- |
+| OSV | 脆弱性詳細・aliases・summary | `GET /v1/vulns/{id}` |
+| CISA KEV | 実際に悪用されているか（既知悪用脆弱性判定） | `dateAdded` / `requiredAction` 等 |
+| EPSS | 今後悪用される可能性スコア（0.0〜1.0） | FIRST API、CVE のみ対象 |
+| SBOM | direct / transitive 判定 | `--sbom` オプションで指定 |
+
+### 残タスク
+
+| 内容 | 優先度 |
 | --- | --- |
-| OSV | 脆弱性詳細・影響バージョン・修正バージョン |
-| GHSA | Advisory 詳細・References |
-| CISA KEV | 実際に悪用されているか（既知悪用脆弱性判定） |
-| EPSS | 今後悪用される可能性スコア |
-
-将来候補: ExploitDB / Vendor Advisory / Packet Storm
-
-### Conditions の実装
-
-Phase 1 で収集できなかった「悪用に必要な条件」をコード検索で補完する。
+| ExploitDB 連携 | 中 |
+| Conditions（悪用に必要な条件のコード検索） | 低 |
 
 ### 入出力
 
 ```
-入力: scan.json
-出力: enriched.json
+入力: scan_{short}_{HASH}{YYMMDDHH}.json
+出力: enriched_{short}_{HASH}{YYMMDDHH}.json（同ディレクトリ）
+```
+
+### EnrichedFinding の追加フィールド
+
+```typescript
+{
+  dependencyType?: "direct" | "transitive";
+  osv?: { id, aliases, summary, publishedAt, modifiedAt };
+  kev?: { cveId, vendorProject, product, dateAdded, requiredAction, dueDate };
+  epss?: { cve, epss, percentile, date };
+}
 ```
 
 ### LLM
 
-OpenAI（デフォルト）または Ollama を選択可能（Phase 1 と同じ構成）。
+Phase 2 では LLM を使用しない。外部 DB のみで補強する。
 
 ---
 
@@ -241,11 +257,11 @@ OpenAI（デフォルト）または Ollama を選択可能（Phase 1・2 と同
 
 ## 開発優先順位
 
-| 優先度 | 内容 |
-| --- | --- |
-| 1 | sentry-scan の残タスク（scanId・profile フィールド） |
-| 2 | sentry-enrich: OSV / KEV / EPSS 連携 |
-| 3 | sentry-enrich: Enriched JSON 設計 |
-| 4 | sentry-report: Markdown 生成 |
-| 5 | sentry-report: PDF 生成 |
-| 6 | 運用改善（差分比較・履歴管理・Slack 通知・チケット自動起票） |
+| 優先度 | 内容 | 状態 |
+| --- | --- | --- |
+| 1 | sentry-scan: ecosystem / purl / fixedVersions | 完了 |
+| 2 | sentry-enrich: OSV / KEV / EPSS 連携 | 完了 |
+| 3 | sentry-enrich: ExploitDB 連携 | 未着手 |
+| 4 | sentry-report: Markdown 生成 | 未着手 |
+| 5 | sentry-report: PDF 生成 | 未着手 |
+| 6 | 運用改善（差分比較・履歴管理・Slack 通知・チケット自動起票） | 未着手 |
