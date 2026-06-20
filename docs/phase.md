@@ -217,17 +217,56 @@ Phase 2 では LLM を使用しない。外部 DB のみで補強する。
 
 ## Phase 3: sentry-report
 
-**目的**: 収集・補強済みデータを、リポジトリ管理チームが読める報告書に変換する。
+### 目的
 
-**進捗**: スキーマ設計完了・実装未着手
+enriched.json をもとに、開発チームが対応判断できる Markdown レポートを生成する。
 
-### 入出力
+**進捗**: ReportInput・ReportPlan スキーマ設計完了・Markdown 生成実装中
+
+### 入力
+
+- `enriched_{short}_{HASH}{YYMMDDHH}.json`
+
+### 内部処理
+
+1. `enriched.json` を `ReportInput` に変換（`transformer.ts`）
+2. `ReportInput` をもとに AI が `ReportPlan` JSON を生成（`planner.ts`）
+3. `ReportPlan` と `ReportInput` を Markdown Renderer に渡す（`renderers/markdown.ts`）
+4. `report.md` を生成
+
+### 出力
+
+通常:
 
 ```
-入力: enriched_{short}_{HASH}{YYMMDDHH}.json
-中間: ReportInput（transformer が自動生成）
-出力: report_{short}_{HASH}{YYMMDDHH}.md + .pdf
+report_{short}_{HASH}{YYMMDDHH}-plan.json   ← AI 生成（監査・再利用可能）
+report_{short}_{HASH}{YYMMDDHH}.md          ← Renderer 生成
 ```
+
+`--debug` 時のみ:
+
+```
+report_{short}_{HASH}{YYMMDDHH}-input.json  ← ReportInput（検証用）
+```
+
+### 責務分離
+
+AI が担当するもの:
+
+- `executiveSummary`（総評）
+- `immediateActions` の `reason` / `notes`
+- `plannedActions` の `reason` / `notes`
+- `deferredItems` の `deferReason`
+- `notableRisks`
+
+AI が担当しないもの（Renderer が ReportInput から直接出力）:
+
+- CVE / GHSA 一覧
+- パッケージ名・バージョン
+- 修正バージョン・修正コマンド
+- EPSS / KEV スコア
+- CWE
+- 付録の全 Finding 一覧
 
 ### ReportInput スキーマ（固定版）
 
@@ -313,14 +352,47 @@ interface ReportFinding {
 | severity=high, または medium && epss≥0.4 | `planned` |
 | それ以外 | `deferred` |
 
-### 報告書構成案（未確定）
+### ReportPlan v1
 
-1. エグゼクティブサマリー（総評・即時対応件数・KEV 件数）
-2. スキャン対象（リポジトリ名・実施日時・使用ツール）
-3. 優先対応項目（urgency=immediate）
-4. 計画的対応項目（urgency=planned）
-5. 後回し可能な項目（urgency=deferred）
-6. 全検出一覧
+```typescript
+interface ReportPlan {
+  planVersion: "1";
+  overallRisk: "critical" | "high" | "medium" | "low";
+  executiveSummary: string;
+  immediateActions: PlanAction[];
+  plannedActions: PlanAction[];
+  deferredItems: PlanDeferral[];
+  notableRisks: NotableRisk[];
+}
+
+interface PlanAction {
+  findingId?: string;
+  title: string;
+  reason: string;   // なぜ対応すべきか（AI が記述）
+  notes?: string;   // アップグレード時の注意など（任意）
+}
+
+interface PlanDeferral {
+  findingId?: string;
+  title: string;
+  deferReason: string;
+}
+
+interface NotableRisk {
+  title: string;
+  description: string;
+}
+```
+
+### Markdown 構成
+
+1. エグゼクティブサマリー（ReportPlan）
+2. スキャン概要（ReportInput）
+3. 即時対応項目（urgency=immediate）
+4. 計画対応項目（urgency=planned）
+5. 後回し可能項目（urgency=deferred）
+6. 修正ガイド（fixAvailable=true の一覧）
+7. 付録: 全 Finding 一覧
 
 ### LLM
 
@@ -335,7 +407,7 @@ OpenAI（デフォルト）または Ollama を選択可能（Phase 1・2 と同
 | 1 | sentry-scan: ecosystem / purl / fixedVersions | 完了 |
 | 2 | sentry-enrich: OSV / KEV / EPSS 連携 | 完了 |
 | 3 | sentry-enrich: ExploitDB 連携 | 未着手 |
-| 4 | sentry-report: ReportInput スキーマ設計 | 完了 |
-| 5 | sentry-report: Markdown 生成 | 未着手 |
-| 6 | sentry-report: PDF 生成 | 未着手 |
+| 4 | sentry-report: ReportInput / ReportPlan スキーマ設計 | 完了 |
+| 5 | sentry-report: Markdown 生成 | 実装中 |
+| 6 | sentry-report: PDF 生成（sentry-export として分離） | 未着手 |
 | 6 | 運用改善（差分比較・履歴管理・Slack 通知・チケット自動起票） | 未着手 |
