@@ -219,35 +219,108 @@ Phase 2 では LLM を使用しない。外部 DB のみで補強する。
 
 **目的**: 収集・補強済みデータを、リポジトリ管理チームが読める報告書に変換する。
 
-**進捗**: 未着手
+**進捗**: スキーマ設計完了・実装未着手
 
 ### 入出力
 
 ```
-入力: scan.json + enriched.json
-出力: report.md + report.pdf
+入力: enriched_{short}_{HASH}{YYMMDDHH}.json
+中間: ReportInput（transformer が自動生成）
+出力: report_{short}_{HASH}{YYMMDDHH}.md + .pdf
 ```
 
-### 報告書構成案
+### ReportInput スキーマ（固定版）
 
-1. エグゼクティブサマリー（総評・リスク概要・推奨アクション）
+`src/sentry-report/types.ts` にて定義。`buildReportInput()` で EnrichedReport → ReportInput に変換。
+
+```typescript
+interface ReportInput {
+  reportInputVersion: "1";
+  scanId: string;
+  enrichId?: string;
+  profile: string;
+  repository?: string;
+  scannedAt: string;
+  summary: ReportSummary;   // total / critical / high / medium / low / immediate / kevCount / epssHighCount
+  findings: ReportFinding[]; // priorityScore 降順ソート済み
+}
+
+interface ReportFinding {
+  findingId?: string;
+  tool: string;
+  category: string;
+  package?: {
+    ecosystem: string;
+    name: string;
+    version: string;
+    purl: string;
+    dependencyType?: "direct" | "transitive";
+  };
+  riskSignals: {
+    severity: string;
+    epss?: number;           // 0.0–1.0
+    epssPercentile?: number;
+    kev: boolean;
+    hasFixedVersion: boolean;
+    priorityScore: number;   // 0–100 自動計算
+  };
+  recommendedAction: {
+    action: "upgrade" | "mitigate" | "monitor" | "accept";
+    urgency: "immediate" | "planned" | "deferred";
+    fixAvailable: boolean;
+    fixedVersions?: string[];
+    command?: string;
+  };
+  context: {
+    title: string;
+    description?: string;
+    location?: string;
+    cweIds?: string[];
+    url?: string;
+    osvSummary?: string;
+    osvAliases?: string[];
+    kevDateAdded?: string;
+    kevRequiredAction?: string;
+    attackCategory?: string;      // Clearwing 由来
+    impact?: string[];            // Clearwing 由来
+    affectedFeatures?: string[];  // Clearwing 由来
+    analysisSource?: "clearwing";
+  };
+}
+```
+
+### priorityScore 計算式
+
+| 要素 | 加算 |
+| --- | --- |
+| critical | +40 |
+| high | +25 |
+| medium | +15 |
+| low | +5 |
+| kev=true | +40（実悪用確認済み） |
+| epss ≥ 0.9 | +20 |
+| epss ≥ 0.7 | +10 |
+| epss ≥ 0.4 | +5 |
+| direct 依存 | +5 |
+| 上限 | 100 |
+
+### urgency 導出ルール
+
+| 条件 | urgency |
+| --- | --- |
+| kev=true | `immediate` |
+| severity=critical | `immediate` |
+| severity=high, または medium && epss≥0.4 | `planned` |
+| それ以外 | `deferred` |
+
+### 報告書構成案（未確定）
+
+1. エグゼクティブサマリー（総評・即時対応件数・KEV 件数）
 2. スキャン対象（リポジトリ名・実施日時・使用ツール）
-3. 検出サマリー（Critical / High / Medium / Low 件数）
-4. 優先対応項目（即時対応推奨・修正理由・想定リスク）
-5. 計画的対応項目（中長期対応・アップデート計画）
-6. 後回し可能な項目（条件付き影響・Exploit 未確認等）
-7. 修正ガイド（修正対象・推奨バージョン・修正コマンド）
-8. 類似事例（実際のインシデント・Advisory・関連情報）
-9. 全検出一覧
-
-### AI 判断材料
-
-Report AI が参照する情報:
-- Severity / CVSS / EPSS / KEV
-- Exploit 有無
-- Affected Package / Installed Version / Fixed Version
-- 利用機能（Affected Features）
-- Production / Development Dependency
+3. 優先対応項目（urgency=immediate）
+4. 計画的対応項目（urgency=planned）
+5. 後回し可能な項目（urgency=deferred）
+6. 全検出一覧
 
 ### LLM
 
@@ -262,6 +335,7 @@ OpenAI（デフォルト）または Ollama を選択可能（Phase 1・2 と同
 | 1 | sentry-scan: ecosystem / purl / fixedVersions | 完了 |
 | 2 | sentry-enrich: OSV / KEV / EPSS 連携 | 完了 |
 | 3 | sentry-enrich: ExploitDB 連携 | 未着手 |
-| 4 | sentry-report: Markdown 生成 | 未着手 |
-| 5 | sentry-report: PDF 生成 | 未着手 |
+| 4 | sentry-report: ReportInput スキーマ設計 | 完了 |
+| 5 | sentry-report: Markdown 生成 | 未着手 |
+| 6 | sentry-report: PDF 生成 | 未着手 |
 | 6 | 運用改善（差分比較・履歴管理・Slack 通知・チケット自動起票） | 未着手 |
