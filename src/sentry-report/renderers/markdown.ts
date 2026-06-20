@@ -64,7 +64,7 @@ export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): stri
     lines.push("## 即時対応項目");
     lines.push("");
     for (const f of immediateFindings) {
-      lines.push(...renderFindingWithPlan(f, planLookup, "action"));
+      lines.push(...renderFindingWithPlan(f, planLookup, "immediate"));
     }
   }
 
@@ -73,7 +73,7 @@ export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): stri
     lines.push("## 計画対応項目");
     lines.push("");
     for (const f of plannedFindings) {
-      lines.push(...renderFindingWithPlan(f, planLookup, "action"));
+      lines.push(...renderFindingWithPlan(f, planLookup, "planned"));
     }
   }
 
@@ -82,7 +82,7 @@ export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): stri
     lines.push("## 後回し可能項目");
     lines.push("");
     for (const f of deferredFindings) {
-      lines.push(...renderFindingWithPlan(f, planLookup, "deferral"));
+      lines.push(...renderFindingWithPlan(f, planLookup, "deferred"));
     }
   }
 
@@ -129,28 +129,52 @@ export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): stri
   return lines.join("\n") + "\n";
 }
 
-// finding を planLookup の AI テキストで補完してレンダー
+const FALLBACK_REASON = {
+  immediate: "悪用状況または重大度を踏まえ、優先的に確認・対応してください。",
+  planned:   "修正版が提供されているため、通常のアップデート計画に組み込んで対応してください。",
+  deferred:  "現時点では即時対応条件には該当しないため、他の高優先度項目の対応後に確認してください。",
+} as const;
+
+const CONTRADICTION_PATTERNS: Record<"immediate" | "planned" | "deferred", string[]> = {
+  immediate: ["後回し", "計画的"],
+  planned:   ["後回しでよい", "後回しで良い"],
+  deferred:  ["計画的に対応", "即時", "直ちに対応"],
+};
+
+function sanitizeReason(
+  text: string,
+  section: "immediate" | "planned" | "deferred",
+  findingId?: string,
+): string {
+  const contradicts = CONTRADICTION_PATTERNS[section].some((p) => text.includes(p));
+  if (contradicts) {
+    console.error(
+      `[sentry-report] warning: ${findingId ?? "?"} の reason が ${section} セクションと矛盾するためデフォルト文に置き換えました`,
+    );
+    return FALLBACK_REASON[section];
+  }
+  return text;
+}
+
+// finding を planLookup の AI テキストで補完してレンダー（セクション整合性チェック付き）
 function renderFindingWithPlan(
   f: ReportFinding,
   planLookup: Map<string, PlanAction | PlanDeferral>,
-  prefer: "action" | "deferral",
+  section: "immediate" | "planned" | "deferred",
 ): string[] {
   const planItem = f.findingId ? planLookup.get(f.findingId) : undefined;
   if (!planItem) return renderFindingFallback(f);
 
-  if ("reason" in planItem) {
-    if (prefer === "deferral") {
-      // urgency=deferred だが AI は action として記述 → deferReason として流用
-      return renderDeferralSection({ findingId: planItem.findingId, title: planItem.title, deferReason: planItem.reason }, f);
-    }
-    return renderActionSection(planItem, f);
+  if (section === "deferred") {
+    const rawText = "deferReason" in planItem ? planItem.deferReason : planItem.reason;
+    const text = sanitizeReason(rawText, "deferred", f.findingId);
+    return renderDeferralSection({ findingId: planItem.findingId, title: planItem.title, deferReason: text }, f);
+  } else {
+    const rawText = "reason" in planItem ? planItem.reason : planItem.deferReason;
+    const notes = "notes" in planItem ? (planItem as PlanAction).notes : undefined;
+    const text = sanitizeReason(rawText, section, f.findingId);
+    return renderActionSection({ findingId: planItem.findingId, title: planItem.title, reason: text, notes }, f);
   }
-  // "deferReason" in planItem
-  if (prefer === "action") {
-    // urgency=immediate/planned だが AI は defer として記述 → reason として流用
-    return renderActionSection({ findingId: planItem.findingId, title: planItem.title, reason: planItem.deferReason }, f);
-  }
-  return renderDeferralSection(planItem, f);
 }
 
 function renderActionSection(action: PlanAction, f: ReportFinding | undefined): string[] {
