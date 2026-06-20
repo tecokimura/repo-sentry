@@ -118,9 +118,16 @@ if [[ -n "$SBOM_FILE" ]]; then
   _enrich_args+=(--sbom "/workspace/reports/${SBOM_FILE#${_reports_dir}/}")
 fi
 
+# .envファイルがあればコンテナに渡す（シェル変数が優先される）
+_env_file_args=()
+if [[ -f "${ENV_FILE:-.env}" ]]; then
+  _env_file_args=(--env-file "${ENV_FILE:-.env}")
+fi
+
 _enrich_exit=0
 docker run --rm \
   --user "$DOCKER_USER" \
+  ${_env_file_args[@]+"${_env_file_args[@]}"} \
   -e DENO_DIR=/workspace/.repo-sentry/deno-cache \
   -v "${_reports_dir}:/workspace/reports" \
   -v "${CACHE_DIR}:/workspace/.repo-sentry" \
