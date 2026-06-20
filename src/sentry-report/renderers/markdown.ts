@@ -4,11 +4,16 @@ import type { ReportInput, ReportFinding } from "../types.ts";
 export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): string {
   const lines: string[] = [];
   const scanDate = input.scannedAt.slice(0, 16).replace("T", " ");
-  const findingMap = buildFindingMap(input);
-  // findingId → plan item（immediate > planned > deferred の優先順、重複は最初のみ）
+  // AI reason / notes を findingId で引けるよう平坦化
   const planLookup = buildPlanLookup(plan);
-  // レンダー済み findingId を追跡してセクション間の重複を防ぐ
-  const rendered = new Set<string>();
+
+  // 表示グループは ReportInput.urgency を正規分類として使用
+  const immediateFindings = input.findings.filter((f) => f.recommendedAction.urgency === "immediate");
+  const plannedFindings   = input.findings.filter((f) => f.recommendedAction.urgency === "planned");
+  const deferredFindings  = input.findings.filter((f) => f.recommendedAction.urgency === "deferred");
+
+  // AI plan と urgency のズレを警告（後で参照するため先に収集）
+  warnUrgencyMismatch(plan, input, planLookup);
 
   // Title
   const title = input.repository
@@ -50,63 +55,34 @@ export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): stri
   if (input.summary.epssHighCount > 0) {
     lines.push(`| EPSS ≥ 70% | ${input.summary.epssHighCount} 件 |`);
   }
-  lines.push(`| 即時対応が必要 | **${plan.immediateActions.length} 件** |`);
+  // 即時対応は正規化後の件数（ReportInput.urgency ベース）
+  lines.push(`| 即時対応が必要 | **${immediateFindings.length} 件** |`);
   lines.push("");
 
-  // 3. Immediate Actions（AI plan 優先）
-  const immediateFromUrgency = input.findings.filter((f) => f.recommendedAction.urgency === "immediate");
-  if (plan.immediateActions.length > 0 || immediateFromUrgency.length > 0) {
+  // 3. Immediate Actions（ReportInput urgency=immediate が権威）
+  if (immediateFindings.length > 0) {
     lines.push("## 即時対応項目");
     lines.push("");
-    for (const action of plan.immediateActions) {
-      const f = action.findingId ? findingMap.get(action.findingId) : undefined;
-      lines.push(...renderActionSection(action, f));
-      if (action.findingId) rendered.add(action.findingId);
-    }
-    for (const f of immediateFromUrgency) {
-      if (!f.findingId || rendered.has(f.findingId)) continue;
-      lines.push(...renderFindingWithPlanLookup(f, planLookup, "action"));
-      rendered.add(f.findingId);
+    for (const f of immediateFindings) {
+      lines.push(...renderFindingWithPlan(f, planLookup, "action"));
     }
   }
 
-  // 4. Planned Actions（AI plan 優先、rendered済みをスキップ）
-  const plannedFromUrgency = input.findings.filter((f) => f.recommendedAction.urgency === "planned");
-  const hasPlanned = plan.plannedActions.some((a) => !a.findingId || !rendered.has(a.findingId)) ||
-    plannedFromUrgency.some((f) => !f.findingId || !rendered.has(f.findingId));
-  if (hasPlanned) {
+  // 4. Planned Actions（ReportInput urgency=planned が権威）
+  if (plannedFindings.length > 0) {
     lines.push("## 計画対応項目");
     lines.push("");
-    for (const action of plan.plannedActions) {
-      if (action.findingId && rendered.has(action.findingId)) continue;
-      const f = action.findingId ? findingMap.get(action.findingId) : undefined;
-      lines.push(...renderActionSection(action, f));
-      if (action.findingId) rendered.add(action.findingId);
-    }
-    for (const f of plannedFromUrgency) {
-      if (!f.findingId || rendered.has(f.findingId)) continue;
-      lines.push(...renderFindingWithPlanLookup(f, planLookup, "action"));
-      rendered.add(f.findingId);
+    for (const f of plannedFindings) {
+      lines.push(...renderFindingWithPlan(f, planLookup, "action"));
     }
   }
 
-  // 5. Deferred Items（AI plan 優先、rendered済みをスキップ）
-  const deferredFromUrgency = input.findings.filter((f) => f.recommendedAction.urgency === "deferred");
-  const hasDeferred = plan.deferredItems.some((d) => !d.findingId || !rendered.has(d.findingId)) ||
-    deferredFromUrgency.some((f) => !f.findingId || !rendered.has(f.findingId));
-  if (hasDeferred) {
+  // 5. Deferred Items（ReportInput urgency=deferred が権威）
+  if (deferredFindings.length > 0) {
     lines.push("## 後回し可能項目");
     lines.push("");
-    for (const item of plan.deferredItems) {
-      if (item.findingId && rendered.has(item.findingId)) continue;
-      const f = item.findingId ? findingMap.get(item.findingId) : undefined;
-      lines.push(...renderDeferralSection(item, f));
-      if (item.findingId) rendered.add(item.findingId);
-    }
-    for (const f of deferredFromUrgency) {
-      if (!f.findingId || rendered.has(f.findingId)) continue;
-      lines.push(...renderFindingWithPlanLookup(f, planLookup, "deferral"));
-      rendered.add(f.findingId);
+    for (const f of deferredFindings) {
+      lines.push(...renderFindingWithPlan(f, planLookup, "deferral"));
     }
   }
 
@@ -153,23 +129,28 @@ export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): stri
   return lines.join("\n") + "\n";
 }
 
-function renderFindingWithPlanLookup(
+// finding を planLookup の AI テキストで補完してレンダー
+function renderFindingWithPlan(
   f: ReportFinding,
   planLookup: Map<string, PlanAction | PlanDeferral>,
   prefer: "action" | "deferral",
 ): string[] {
   const planItem = f.findingId ? planLookup.get(f.findingId) : undefined;
-  if (planItem) {
-    if ("reason" in planItem) return renderActionSection(planItem, f);
-    if ("deferReason" in planItem) {
-      if (prefer === "action") {
-        // AI が defer 分類したが urgency 上は action → reason として deferReason を流用
-        return renderActionSection({ title: planItem.title, reason: planItem.deferReason }, f);
-      }
-      return renderDeferralSection(planItem, f);
+  if (!planItem) return renderFindingFallback(f);
+
+  if ("reason" in planItem) {
+    if (prefer === "deferral") {
+      // urgency=deferred だが AI は action として記述 → deferReason として流用
+      return renderDeferralSection({ findingId: planItem.findingId, title: planItem.title, deferReason: planItem.reason }, f);
     }
+    return renderActionSection(planItem, f);
   }
-  return renderFindingFallback(f);
+  // "deferReason" in planItem
+  if (prefer === "action") {
+    // urgency=immediate/planned だが AI は defer として記述 → reason として流用
+    return renderActionSection({ findingId: planItem.findingId, title: planItem.title, reason: planItem.deferReason }, f);
+  }
+  return renderDeferralSection(planItem, f);
 }
 
 function renderActionSection(action: PlanAction, f: ReportFinding | undefined): string[] {
@@ -243,17 +224,9 @@ function renderFindingTable(f: ReportFinding): string[] {
   ];
 }
 
-function buildFindingMap(input: ReportInput): Map<string, ReportFinding> {
-  const map = new Map<string, ReportFinding>();
-  for (const f of input.findings) {
-    if (f.findingId) map.set(f.findingId, f);
-  }
-  return map;
-}
-
+// findingId → plan item（immediate > planned > deferred 優先、重複は最初のみ）
 function buildPlanLookup(plan: ReportPlan): Map<string, PlanAction | PlanDeferral> {
   const map = new Map<string, PlanAction | PlanDeferral>();
-  // immediate > planned > deferred の優先順で最初のものを保持
   for (const a of [...plan.immediateActions, ...plan.plannedActions]) {
     if (a.findingId && !map.has(a.findingId)) map.set(a.findingId, a);
   }
@@ -261,6 +234,33 @@ function buildPlanLookup(plan: ReportPlan): Map<string, PlanAction | PlanDeferra
     if (d.findingId && !map.has(d.findingId)) map.set(d.findingId, d);
   }
   return map;
+}
+
+// AI plan の urgency 分類と ReportInput urgency のズレを stderr に出力
+function warnUrgencyMismatch(
+  plan: ReportPlan,
+  input: ReportInput,
+  planLookup: Map<string, PlanAction | PlanDeferral>,
+): void {
+  const urgencyMap = new Map<string, "immediate" | "planned" | "deferred">();
+  for (const f of input.findings) {
+    if (f.findingId) urgencyMap.set(f.findingId, f.recommendedAction.urgency);
+  }
+
+  const check = (section: "immediate" | "planned" | "deferred", ids: (string | undefined)[]) => {
+    for (const id of ids) {
+      if (!id) continue;
+      const actual = urgencyMap.get(id);
+      if (actual && actual !== section) {
+        console.error(
+          `[sentry-report] warning: ${id} は AI plan で ${section} 分類ですが urgency=${actual} のため ${actual === "immediate" ? "即時対応" : actual === "planned" ? "計画対応" : "後回し"} に表示します`,
+        );
+      }
+    }
+  };
+  check("immediate", plan.immediateActions.map((a) => a.findingId));
+  check("planned",   plan.plannedActions.map((a) => a.findingId));
+  check("deferred",  plan.deferredItems.map((d) => d.findingId));
 }
 
 function riskLabel(risk: string): string {
