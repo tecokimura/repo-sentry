@@ -106,7 +106,7 @@ async function callChatCompletion(
       temperature: 0.3,
       max_tokens: 2000,
     }),
-    signal: AbortSignal.timeout(180000),
+    signal: AbortSignal.timeout(600000),
   });
 
   if (!res.ok) {
