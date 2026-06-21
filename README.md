@@ -129,6 +129,8 @@ reports/
 | `kev` | [CISA KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) | 実際に悪用されているか（dateAdded など） |
 | `epss` | [FIRST EPSS](https://www.first.org/epss/) | 今後悪用される可能性スコア（0.0〜1.0） |
 | `dependencyType` | SBOM | `direct` または `transitive`（SBOM 指定時のみ） |
+| `canonicalReference` | finding.id から生成 | CVE → AVD URL、GHSA → GitHub Advisory URL |
+| `invalidReferences` | URL 検証 | finding.id と一致しない URL を記録（report では非表示） |
 
 ### docker-enrich.sh オプション
 
@@ -151,6 +153,14 @@ reports/
 ```bash
 ./scripts/docker-build-scan.sh    # repo-sentry-scan:local
 ./scripts/docker-build-enrich.sh  # repo-sentry-enrich:local
+./scripts/docker-build-report.sh  # repo-sentry-report:local
+```
+
+`--no-cache` オプションを付けると Docker キャッシュを使わずにビルドします。
+
+```bash
+./scripts/docker-build-enrich.sh --no-cache
+./scripts/docker-build-report.sh --no-cache
 ```
 
 ---
@@ -594,6 +604,7 @@ Renderer（`ReportInput` から直接）が担当する内容:
 | `ENRICHED_JSON` | 対象の `enriched_*.json` ファイルパス（必須） |
 | `--output PATH` | `report.md` の出力パス（省略時は入力と同ディレクトリに自動生成） |
 | `--plan-output PATH` | `report-plan.json` の出力パス |
+| `--plan-input PATH` | 既存の `report-plan.json` を再利用（AI 呼び出しをスキップ） |
 | `--debug` | `report-input.json` も保存（デバッグ用） |
 
 ---
@@ -674,18 +685,23 @@ Ollama 使用時、Mac の Docker は Apple Silicon GPU（Metal）が使えな�
 - CycloneDX SBOM 生成（デフォルト有効、`--no-sbom` で無効化）
 - fixture ベースの tests
 
-**sentry-enrich（Phase 2）**: 実装中
+**sentry-enrich（Phase 2）**: 完了
 
 - OSV データベース連携
 - CISA KEV 連携（既知悪用脆弱性判定）
 - EPSS スコア取得
 - SBOM による direct/transitive 判定
+- 参考 URL 検証（canonicalReference 生成・不正 URL 分離）
 
-**sentry-report（Phase 3）**: 実装中
+**sentry-report（Phase 3）**: 初期安定版完了
 
 - ReportInput スキーマ・priorityScore 自動計算
 - AI による ReportPlan 生成（OpenAI / Ollama）
+- urgency 自動導出（KEV / CVSS / EPSS 由来）
+- 推奨修正バージョン・エコシステム別修正コマンド自動生成
 - Markdown レポート生成（AI 文章 + 機械データの分離）
+- エグゼクティブサマリー事実検証（AI テキスト矛盾検出・フォールバック）
+- canonicalReference 優先の参考 URL 表示
 
 未実装または後続予定:
 

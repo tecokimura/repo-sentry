@@ -28,17 +28,18 @@ repo-sentry/
       reporters/
   Dockerfile          sentry-scan 用
   Dockerfile.enrich   sentry-enrich 用
-  Dockerfile.report   sentry-report 用（未実装）
+  Dockerfile.report   sentry-report 用
   deno.json           ルートに1つ（Denoキャッシュ共有）
   docs/
   scripts/
     docker-build.sh           両 image を一括 build
     docker-build-scan.sh      sentry-scan image build
     docker-build-enrich.sh    sentry-enrich image build
+    docker-build-report.sh    sentry-report image build
     docker-scan.sh
     docker-scan-clearwing.sh
     docker-enrich.sh
-    docker-report.sh          （未実装）
+    docker-report.sh
 ```
 
 ### 出力ファイル構成
@@ -173,7 +174,7 @@ LLM: OpenAI（デフォルト）または Ollama を選択可能。
 
 **目的**: Phase 1 の scan.json を外部脆弱性データベースで補強する。
 
-**進捗**: 実装中（約60〜70%）
+**進捗**: 完了
 
 ### 実装済み
 
@@ -183,6 +184,7 @@ LLM: OpenAI（デフォルト）または Ollama を選択可能。
 | CISA KEV | 実際に悪用されているか（既知悪用脆弱性判定） | `dateAdded` / `requiredAction` 等 |
 | EPSS | 今後悪用される可能性スコア（0.0〜1.0） | FIRST API、CVE のみ対象 |
 | SBOM | direct / transitive 判定 | `--sbom` オプションで指定 |
+| 参考 URL 検証 | canonicalReference 生成・不正 URL 分離 | CVE→AVD URL、GHSA→GitHub Advisory URL |
 
 ### 残タスク
 
@@ -206,6 +208,8 @@ LLM: OpenAI（デフォルト）または Ollama を選択可能。
   osv?: { id, aliases, summary, publishedAt, modifiedAt };
   kev?: { cveId, vendorProject, product, dateAdded, requiredAction, dueDate };
   epss?: { cve, epss, percentile, date };
+  canonicalReference?: string;   // CVE→AVD URL / GHSA→GitHub Advisory URL
+  invalidReferences?: string[];  // finding.id と一致しない URL（sentry-report では非表示）
 }
 ```
 
@@ -221,7 +225,7 @@ Phase 2 では LLM を使用しない。外部 DB のみで補強する。
 
 enriched.json をもとに、開発チームが対応判断できる Markdown レポートを生成する。
 
-**進捗**: ReportInput・ReportPlan スキーマ設計完了・Markdown 生成実装中
+**進捗**: 初期安定版完了（scan → enrich → report パイプライン動作確認済み）
 
 ### 入力
 
@@ -308,7 +312,9 @@ interface ReportFinding {
     urgency: "immediate" | "planned" | "deferred";
     fixAvailable: boolean;
     fixedVersions?: string[];
-    command?: string;
+    recommendedVersion?: string; // 同メジャー・現バージョン超の最小バージョン
+    fixCommand?: string;         // エコシステム別修正コマンド（composer/npm/pip 等）
+    command?: string;            // 後方互換（非推奨）
   };
   context: {
     title: string;
@@ -406,8 +412,9 @@ OpenAI（デフォルト）または Ollama を選択可能（Phase 1・2 と同
 | --- | --- | --- |
 | 1 | sentry-scan: ecosystem / purl / fixedVersions | 完了 |
 | 2 | sentry-enrich: OSV / KEV / EPSS 連携 | 完了 |
-| 3 | sentry-enrich: ExploitDB 連携 | 未着手 |
+| 3 | sentry-enrich: 参考 URL 検証・canonicalReference 生成 | 完了 |
 | 4 | sentry-report: ReportInput / ReportPlan スキーマ設計 | 完了 |
-| 5 | sentry-report: Markdown 生成・Docker 実行環境 | 実装中 |
-| 6 | sentry-export: PDF 生成（別ツールとして分離） | 未着手 |
-| 6 | 運用改善（差分比較・履歴管理・Slack 通知・チケット自動起票） | 未着手 |
+| 5 | sentry-report: Markdown 生成・Docker 実行環境 | 完了 |
+| 6 | sentry-enrich: ExploitDB 連携 | 未着手 |
+| 7 | sentry-export: PDF 生成（別ツールとして分離） | 未着手 |
+| 8 | 運用改善（差分比較・履歴管理・Slack 通知・チケット自動起票） | 未着手 |
