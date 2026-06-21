@@ -33,7 +33,7 @@ export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): stri
   lines.push("");
   // AI の executiveSummary は補足文として使用（矛盾する場合は非表示）
   if (plan.executiveSummary) {
-    const conflicts = detectSummaryConflicts(plan.executiveSummary, input.summary);
+    const conflicts = detectSummaryConflicts(plan.executiveSummary, input.summary, plannedFindings.length);
     if (conflicts.length > 0) {
       for (const c of conflicts) {
         console.error(`[sentry-report] warning: executiveSummary が summaryFacts と矛盾: ${c}`);
@@ -335,7 +335,7 @@ function buildSummaryOpening(summary: ReportSummary, immediateCount: number): st
 
 type SummaryConflict = string;
 
-function detectSummaryConflicts(text: string, summary: ReportSummary): SummaryConflict[] {
+function detectSummaryConflicts(text: string, summary: ReportSummary, plannedCount: number): SummaryConflict[] {
   const conflicts: SummaryConflict[] = [];
   const highOrAbove = summary.high + summary.critical;
 
@@ -346,9 +346,23 @@ function detectSummaryConflicts(text: string, summary: ReportSummary): SummaryCo
       "高リスクは確認されません",
       "高リスクは見られません",
       "高い脆弱性はありません",
+      "高リスクの脆弱性は見つかりません",
+      "高リスクの脆弱性は検出されません",
     ];
     if (negations.some((p) => text.includes(p))) {
       conflicts.push(`high=${summary.high}/critical=${summary.critical} なのに高リスク否定表現あり`);
+    }
+  }
+
+  if (plannedCount > 0) {
+    const allDeferredPatterns = [
+      "すべて後回し",
+      "全て後回し",
+      "すべて後回しで",
+      "すべてdeferred",
+    ];
+    if (allDeferredPatterns.some((p) => text.includes(p))) {
+      conflicts.push(`planned=${plannedCount} なのに「すべて後回し」表現あり`);
     }
   }
 
