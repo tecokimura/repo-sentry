@@ -32,6 +32,8 @@ export interface EnrichedFinding extends Finding {
   osv?: OsvAdvisory;
   kev?: KevEntry;
   epss?: EpssScore;
+  canonicalReference?: string;
+  invalidReferences?: string[];
 }
 
 export interface EnrichedReport {

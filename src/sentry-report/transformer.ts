@@ -133,7 +133,8 @@ function buildContext(f: EnrichedFinding): FindingContext {
   if (f.description)   ctx.description = f.description;
   if (f.location)      ctx.location = f.location;
   if (f.cweIds?.length) ctx.cweIds = f.cweIds;
-  if (f.url)           ctx.url = f.url;
+  const refUrl = f.canonicalReference ?? f.url;
+  if (refUrl) ctx.url = refUrl;
 
   if (f.osv?.summary)       ctx.osvSummary = f.osv.summary;
   if (f.osv?.aliases?.length) ctx.osvAliases = f.osv.aliases;

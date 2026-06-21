@@ -3,6 +3,7 @@ import type { EnrichedFinding, EnrichedReport, EnrichRequest } from "./types.ts"
 import { enrichWithOsv } from "./enrichers/osv.ts";
 import { enrichWithKev } from "./enrichers/kev.ts";
 import { enrichWithEpss } from "./enrichers/epss.ts";
+import { validateReferences } from "./enrichers/reference.ts";
 import { nowIso } from "../shared/utils.ts";
 import { readJsonFile } from "../shared/utils.ts";
 import { summarizeSeverities } from "../shared/utils.ts";
@@ -15,7 +16,8 @@ export async function runEnrich(request: EnrichRequest): Promise<EnrichedReport>
   [findings] = await Promise.all([
     enrichWithOsv(findings)
       .then((f) => enrichWithKev(f))
-      .then((f) => enrichWithEpss(f)),
+      .then((f) => enrichWithEpss(f))
+      .then((f) => validateReferences(f)),
   ]);
 
   return {
