@@ -227,6 +227,8 @@ function renderFindingFallback(f: ReportFinding): string[] {
     : escMd(f.context.title);
   lines.push(`### ${heading}`);
   lines.push("");
+  const urgency = f.recommendedAction.urgency ?? "deferred";
+  lines.push(FALLBACK_REASON[urgency]);
   lines.push(...renderFindingTable(f));
   lines.push("");
   return lines;
