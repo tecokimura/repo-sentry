@@ -1,5 +1,5 @@
 import type { ReportPlan, PlanAction, PlanDeferral } from "../plan.ts";
-import type { ReportInput, ReportFinding } from "../types.ts";
+import type { ReportInput, ReportFinding, ReportSummary } from "../types.ts";
 import { filterAvailableVersions } from "../semver.ts";
 
 export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): string {
@@ -28,8 +28,22 @@ export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): stri
   lines.push("");
   lines.push(`**総合リスク評価: ${riskLabel(plan.overallRisk)}**`);
   lines.push("");
-  lines.push(plan.executiveSummary);
+  // 決定論的な事実文（Renderer生成）
+  lines.push(buildSummaryOpening(input.summary, immediateFindings.length));
   lines.push("");
+  // AI の executiveSummary は補足文として使用（矛盾する場合は非表示）
+  if (plan.executiveSummary) {
+    const conflicts = detectSummaryConflicts(plan.executiveSummary, input.summary);
+    if (conflicts.length > 0) {
+      for (const c of conflicts) {
+        console.error(`[sentry-report] warning: executiveSummary が summaryFacts と矛盾: ${c}`);
+      }
+      console.error("[sentry-report] warning: executiveSummary の表示をスキップしました（決定論的な冒頭文を使用）");
+    } else {
+      lines.push(plan.executiveSummary);
+      lines.push("");
+    }
+  }
 
   if (plan.notableRisks.length > 0) {
     for (const risk of plan.notableRisks) {
@@ -296,6 +310,70 @@ function warnUrgencyMismatch(
   check("immediate", plan.immediateActions.map((a) => a.findingId));
   check("planned",   plan.plannedActions.map((a) => a.findingId));
   check("deferred",  plan.deferredItems.map((d) => d.findingId));
+}
+
+function buildSummaryOpening(summary: ReportSummary, immediateCount: number): string {
+  const { critical, high, medium, low, kevCount, epssHighCount } = summary;
+
+  if (critical > 0 && kevCount > 0) {
+    return `今回のスキャンでは Critical の脆弱性が ${critical} 件検出され、うち ${kevCount} 件が KEV（実悪用確認済み）に登録されています。即時対応が必要な項目が ${immediateCount} 件あります。`;
+  }
+  if (critical > 0) {
+    return `今回のスキャンでは Critical の脆弱性が ${critical} 件検出されました。即時対応対象は ${immediateCount} 件です。`;
+  }
+  if (high > 0 && kevCount > 0) {
+    return `今回のスキャンでは High の脆弱性が ${high} 件、うち ${kevCount} 件が KEV（実悪用確認済み）に登録されています。即時対応が必要な項目が ${immediateCount} 件あります。`;
+  }
+  if (high > 0) {
+    return `今回のスキャンでは High の脆弱性が ${high} 件検出されました。Critical / KEV には該当しないため即時対応対象は ${immediateCount} 件ですが、計画的な対応を推奨します。${epssHighCount > 0 ? ` なお EPSS ≥ 70% の脆弱性が ${epssHighCount} 件含まれます。` : ""}`;
+  }
+  if (medium > 0 || low > 0) {
+    return `今回のスキャンでは Critical / High の脆弱性は検出されませんでした。Medium が ${medium} 件${low > 0 ? `、Low が ${low} 件` : ""}確認されており、通常の更新サイクルでの対応を推奨します。`;
+  }
+  return "今回のスキャンでは脆弱性は検出されませんでした。";
+}
+
+type SummaryConflict = string;
+
+function detectSummaryConflicts(text: string, summary: ReportSummary): SummaryConflict[] {
+  const conflicts: SummaryConflict[] = [];
+  const highOrAbove = summary.high + summary.critical;
+
+  if (highOrAbove > 0) {
+    const negations = [
+      "高リスクの脆弱性は見られません",
+      "高リスクなし",
+      "高リスクは確認されません",
+      "高リスクは見られません",
+      "高い脆弱性はありません",
+    ];
+    if (negations.some((p) => text.includes(p))) {
+      conflicts.push(`high=${summary.high}/critical=${summary.critical} なのに高リスク否定表現あり`);
+    }
+  }
+
+  if (summary.immediate === 0) {
+    const immediateAffirm = ["直ちに対応が必要", "即時対応が必要", "緊急の対応が必要"];
+    if (immediateAffirm.some((p) => text.includes(p))) {
+      conflicts.push("immediate=0 なのに即時対応必要の表現あり");
+    }
+  }
+
+  if (summary.critical === 0) {
+    const criticalAffirm = ["Critical が存在", "Critical が検出", "Criticalが存在", "クリティカルな脆弱性が存在"];
+    if (criticalAffirm.some((p) => text.includes(p))) {
+      conflicts.push("critical=0 なのに Critical 存在の表現あり");
+    }
+  }
+
+  if (summary.kevCount === 0) {
+    const kevAffirm = ["悪用確認済み", "KEVに登録", "実際に悪用されており", "既に悪用"];
+    if (kevAffirm.some((p) => text.includes(p))) {
+      conflicts.push("kev=0 なのに悪用確認済みの表現あり");
+    }
+  }
+
+  return conflicts;
 }
 
 function riskLabel(risk: string): string {
