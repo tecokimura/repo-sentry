@@ -1,6 +1,15 @@
-# レポートフォーマット仕様
+# レポートフォーマット仕様（Phase 1: sentry-scan）
 
-repo-sentry が生成する Markdown レポートのフォーマット定義。
+> **注意**: このドキュメントは **Phase 1（sentry-scan）** が直接生成する Markdown レポートの
+> フォーマットを説明しています。
+>
+> **Phase 3（sentry-report）** のレポートフォーマット（エグゼクティブサマリー・計画対応項目・
+> 修正ガイドなど）は [docs/phase.md](phase.md) の「Phase 3: sentry-report」セクションを参照してください。
+> sentry-report は `enriched_*.json` を入力として AI と Renderer が協調してレポートを生成します。
+
+---
+
+repo-sentry（sentry-scan）が生成する Markdown レポートのフォーマット定義。
 
 Clearwing を使用しない場合はエンジニア向けの技術データ層として機能し、 Clearwing
 を使用する場合は関係者への共有・意思決定に使えるドキュメントとして機能する。

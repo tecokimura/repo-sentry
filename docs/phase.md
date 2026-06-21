@@ -1,6 +1,27 @@
 # repo-sentry ロードマップ
 
-最終更新: 2026-06-20
+最終更新: 2026-06-21
+
+## このドキュメントの使い方
+
+新しいセッションで作業を再開する場合は、以下の順で読んでください。
+
+1. **このファイル（phase.md）** — 全体構成・各フェーズの実装状況・優先順位
+2. **[README.md](../README.md)** — 実行方法・オプション・環境変数
+3. **[docs/report-format.md](report-format.md)** — Phase 1（sentry-scan）出力フォーマット（Phase 3 ではない）
+4. **[docs/tool-recommendations.md](tool-recommendations.md)** — 実装前設計メモ（参考用・フェーズ番号が異なるので注意）
+
+**現在の状態（2026-06-21）**:
+- Phase 1（sentry-scan）: **完了**
+- Phase 2（sentry-enrich）: **完了**（OSV / KEV / EPSS / 参考 URL 検証）
+- Phase 3（sentry-report）: **初期安定版完了**（実案件での通し実行が次の優先課題）
+
+**次の優先課題**:
+1. 実案件で scan→enrich→report の通し実行（`--plan-input` 含む）
+2. 発見された課題修正 + urgency をプロンプトへ渡す改善
+3. Phase 3 Stable 宣言
+
+---
 
 ---
 
