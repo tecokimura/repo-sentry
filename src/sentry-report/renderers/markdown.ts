@@ -153,7 +153,7 @@ const FALLBACK_REASON = {
 
 const CONTRADICTION_PATTERNS: Record<"immediate" | "planned" | "deferred", string[]> = {
   immediate: ["後回し", "計画的"],
-  planned:   ["後回しでよい", "後回しで良い"],
+  planned:   ["後回しでよい", "後回しで良い", "直ちに対応", "即時対応が必要", "直ちに修正", "緊急の対応が必要"],
   deferred:  ["計画的に対応", "即時", "直ちに対応"],
 };
 
