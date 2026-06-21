@@ -3,7 +3,9 @@ set -euo pipefail
 
 IMAGE="${REPO_SENTRY_REPORT_IMAGE:-repo-sentry-report:local}"
 _no_cache_arg=()
-[[ "${NO_CACHE:-}" == "true" ]] && _no_cache_arg=(--no-cache)
+for _arg in "$@"; do
+  [[ "$_arg" == "--no-cache" ]] && _no_cache_arg=(--no-cache)
+done
 
 docker build \
   "${_no_cache_arg[@]}" \
