@@ -14,7 +14,7 @@
 **現在の状態（2026-06-21）**:
 - Phase 1（sentry-scan）: **完了**
 - Phase 2（sentry-enrich）: **完了**（OSV / KEV / EPSS / 参考 URL 検証）
-- Phase 3（sentry-report）: **初期安定版完了**（実案件での通し実行が次の優先課題）
+- Phase 3（sentry-report）: **ベータ版**（実案件未検証・`--plan-input` 未検証）
 
 **次の優先課題**:
 1. 実案件で scan→enrich→report の通し実行（`--plan-input` 含む）
@@ -106,7 +106,7 @@ reports/
     scan_critter_A3F226041914_cw-std.sbom.cdx.json
     enriched_critter_A3F226041914_cw-std.json    sentry-enrich
     report_critter_A3F226041914_cw-std.md        sentry-report
-    report_critter_A3F226041914_cw-std.pdf
+    report_critter_A3F226041914_cw-std.pdf       （将来: sentry-export）
 ```
 
 **ファイル名プレフィックス**
@@ -137,8 +137,10 @@ sentry-scan
               ▼
          sentry-report
               │
-              ├─ report_{id}_cw-std.md  （チーム向け報告書）
-              └─ report_{id}_cw-std.pdf
+              └─ report_{id}_cw-std.md  （チーム向け報告書）
+                   │
+                   ▼（将来: sentry-export）
+              report_{id}_cw-std.pdf
 ```
 
 ### ツール名の意味
@@ -466,6 +468,34 @@ OpenAI（デフォルト）または Ollama を選択可能（Phase 1・2 と同
 | 3 | sentry-enrich: 参考 URL 検証・canonicalReference 生成 | 完了 |
 | 4 | sentry-report: ReportInput / ReportPlan スキーマ設計 | 完了 |
 | 5 | sentry-report: Markdown 生成・Docker 実行環境 | 完了 |
-| 6 | sentry-enrich: ExploitDB 連携 | 未着手 |
-| 7 | sentry-export: PDF 生成（別ツールとして分離） | 未着手 |
-| 8 | 運用改善（差分比較・履歴管理・Slack 通知・チケット自動起票） | 未着手 |
+| 6 | sentry-enrich: PoC-in-GitHub 検知（OSV aliases / NVD reference から GitHub PoC 有無を確認） | 未着手 |
+| 7 | sentry-enrich: ExploitDB 連携 | 未着手 |
+| 8 | GitHub Actions 統合（Phase 3 Stable 後） | 未着手 |
+| 9 | sentry-export: PDF 生成（sentry-watch より後） | 未着手 |
+
+---
+
+## 将来構想（Phase 4 以降）
+
+### sentry-export
+
+`report.md` から PDF を生成する。配布・アーカイブ用途。
+
+### sentry-watch
+
+SBOM を保管し、新規 CVE・EPSS・KEV の変化を継続監視する。
+
+```
+SBOM
+  ↓
+定期監視（cron / GitHub Actions schedule）
+  ↓
+新規脆弱性 / KEV 追加 / EPSS 急上昇を検出
+  ↓
+Slack / Teams / Email 通知
+  ↓
+sentry-enrich → sentry-report（必要に応じて再生成）
+```
+
+repo-sentry の最終目的は「一度スキャンして終わり」ではなく、
+**リポジトリのセキュリティ状態を継続的に把握・通知する仕組み**を提供することです。
