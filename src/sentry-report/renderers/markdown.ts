@@ -158,10 +158,11 @@ const CONTRADICTION_PATTERNS: Record<"immediate" | "planned" | "deferred", strin
 };
 
 function sanitizeReason(
-  text: string,
+  text: string | undefined,
   section: "immediate" | "planned" | "deferred",
   findingId?: string,
 ): string {
+  if (!text) return FALLBACK_REASON[section];
   const contradicts = CONTRADICTION_PATTERNS[section].some((p) => text.includes(p));
   if (contradicts) {
     console.error(
