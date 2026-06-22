@@ -22,7 +22,7 @@ export async function runEnrich(request: EnrichRequest): Promise<EnrichedReport>
       .then((f) => enrichWithEpss(f))
       .then((f) => validateReferences(f))
       .then((f) => {
-        if (githubToken !== undefined) {
+        if (githubToken) {
           console.error(`[sentry-enrich] GitHub PoC 検索を実行します（GITHUB_TOKEN あり）`);
           return enrichWithGithubPoc(f, { githubToken });
         }
