@@ -31,17 +31,28 @@ export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): stri
   // 決定論的な事実文（Renderer生成）
   lines.push(buildSummaryOpening(input.summary, immediateFindings.length));
   lines.push("");
-  // AI の executiveSummary は補足文として使用（矛盾する場合は非表示）
+  // AI の executiveSummary は補足文として使用（問題のある文を除外し残りを表示）
   if (plan.executiveSummary) {
-    const conflicts = detectSummaryConflicts(plan.executiveSummary, input.summary, plannedFindings.length);
-    if (conflicts.length > 0) {
-      for (const c of conflicts) {
-        console.error(`[sentry-report] warning: executiveSummary が summaryFacts と矛盾: ${c}`);
+    const { cleaned, removedCount } = sanitizeImmediateExpressions(
+      plan.executiveSummary, immediateFindings.length,
+    );
+    if (removedCount > 0) {
+      console.error(
+        `[sentry-report] warning: executiveSummary から即時対応の表現を ${removedCount} 文除外しました（immediate=0）`,
+      );
+    }
+    const summaryText = cleaned.trim();
+    if (summaryText) {
+      const conflicts = detectSummaryConflicts(summaryText, input.summary, plannedFindings.length);
+      if (conflicts.length > 0) {
+        for (const c of conflicts) {
+          console.error(`[sentry-report] warning: executiveSummary が summaryFacts と矛盾: ${c}`);
+        }
+        console.error("[sentry-report] warning: executiveSummary の表示をスキップしました（決定論的な冒頭文を使用）");
+      } else {
+        lines.push(summaryText);
+        lines.push("");
       }
-      console.error("[sentry-report] warning: executiveSummary の表示をスキップしました（決定論的な冒頭文を使用）");
-    } else {
-      lines.push(plan.executiveSummary);
-      lines.push("");
     }
   }
 
@@ -361,6 +372,37 @@ function buildSummaryOpening(summary: ReportSummary, immediateCount: number): st
 
 type SummaryConflict = string;
 
+// immediate=0 のとき即時対応を示唆する文を句点単位で除外する
+function sanitizeImmediateExpressions(
+  text: string,
+  immediateCount: number,
+): { cleaned: string; removedCount: number } {
+  if (immediateCount > 0) return { cleaned: text, removedCount: 0 };
+
+  const patterns = [
+    "即時対応", "緊急対応", "直ちに対応", "早急に対応",
+    "優先的に対応", "至急対応", "直ちに修正", "早急な対応", "緊急な対応",
+  ];
+
+  const parts = text.split("。");
+  const kept: string[] = [];
+  let removedCount = 0;
+
+  for (const part of parts) {
+    if (!part.trim()) {
+      kept.push(part);
+      continue;
+    }
+    if (patterns.some((p) => part.includes(p))) {
+      removedCount++;
+    } else {
+      kept.push(part);
+    }
+  }
+
+  return { cleaned: kept.join("。"), removedCount };
+}
+
 function detectSummaryConflicts(text: string, summary: ReportSummary, plannedCount: number): SummaryConflict[] {
   const conflicts: SummaryConflict[] = [];
   const highOrAbove = summary.high + summary.critical;
@@ -389,13 +431,6 @@ function detectSummaryConflicts(text: string, summary: ReportSummary, plannedCou
     ];
     if (allDeferredPatterns.some((p) => text.includes(p))) {
       conflicts.push(`planned=${plannedCount} なのに「すべて後回し」表現あり`);
-    }
-  }
-
-  if (summary.immediate === 0) {
-    const immediateAffirm = ["直ちに対応が必要", "即時対応が必要", "緊急の対応が必要"];
-    if (immediateAffirm.some((p) => text.includes(p))) {
-      conflicts.push("immediate=0 なのに即時対応必要の表現あり");
     }
   }
 
