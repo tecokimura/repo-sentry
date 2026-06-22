@@ -128,6 +128,18 @@ async function callChatCompletion(
   return data.choices?.[0]?.message?.content ?? "";
 }
 
+/** 必須フィールドの補完。--plan-input での再利用時にも適用する。 */
+export function normalizeReportPlan(plan: ReportPlan): ReportPlan {
+  plan.planVersion = REPORT_PLAN_VERSION;
+  plan.overallRisk ??= "medium";
+  plan.executiveSummary ??= "";
+  plan.immediateActions ??= [];
+  plan.plannedActions ??= [];
+  plan.deferredItems ??= [];
+  plan.notableRisks ??= [];
+  return plan;
+}
+
 function parseReportPlan(raw: string): ReportPlan {
   // モデルが ```json ... ``` でラップする場合に対応
   const stripped = raw.replace(/^```(?:json)?\s*/m, "").replace(/\s*```\s*$/m, "").trim();
@@ -139,14 +151,5 @@ function parseReportPlan(raw: string): ReportPlan {
     throw new Error(`ReportPlan の JSON パースに失敗: ${safeErrorMessage(e)}\nraw:\n${raw.slice(0, 300)}`);
   }
 
-  // 必須フィールドの補完（AI が省略した場合のフォールバック）
-  parsed.planVersion = REPORT_PLAN_VERSION;
-  parsed.overallRisk ??= "medium";
-  parsed.executiveSummary ??= "";
-  parsed.immediateActions ??= [];
-  parsed.plannedActions ??= [];
-  parsed.deferredItems ??= [];
-  parsed.notableRisks ??= [];
-
-  return parsed;
+  return normalizeReportPlan(parsed);
 }

@@ -3,7 +3,7 @@ import type { ReportInput } from "./types.ts";
 import type { ReportPlan } from "./plan.ts";
 import type { PlannerConfig } from "./planner.ts";
 import { buildReportInput } from "./transformer.ts";
-import { generateReportPlan } from "./planner.ts";
+import { generateReportPlan, normalizeReportPlan } from "./planner.ts";
 import { renderMarkdownReport } from "./renderers/markdown.ts";
 import { readJsonFile, writeTextFile } from "../shared/utils.ts";
 
@@ -34,7 +34,7 @@ export async function runReport(request: ReportRequest): Promise<ReportResult> {
 
   let plan: ReportPlan;
   if (request.planInput) {
-    plan = await readJsonFile(request.planInput) as ReportPlan;
+    plan = normalizeReportPlan(await readJsonFile(request.planInput) as ReportPlan);
     console.error(`[sentry-report] plan     ← ${request.planInput} (再利用)`);
   } else {
     plan = await generateReportPlan(reportInput, request.planner);
