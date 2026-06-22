@@ -44,6 +44,7 @@ export interface FindingContext {
   impact?: string[];
   affectedFeatures?: string[];
   analysisSource?: "clearwing";
+  pocUrls?: string[];
 }
 
 export interface ReportFinding {

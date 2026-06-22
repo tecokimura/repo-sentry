@@ -19,6 +19,9 @@ Options:
   -h, --help            このヘルプを表示
 
 環境変数:
+  GITHUB_TOKEN          GitHub Personal Access Token（スコープ不要）
+                        設定すると CVE ごとに GitHub Search API で PoC リポジトリを検索する
+                        未設定時は OSV references からの PoC 抽出のみ実行
   REPORTS_DIR           reports ルートディレクトリ (default: 入力ファイルの親の親)
   REPORT_DATE           日時文字列 YYMMDDHH (default: 現在時刻)
   CACHE_DIR             Deno キャッシュディレクトリ (default: .repo-sentry/)
@@ -129,6 +132,7 @@ docker run --rm \
   --user "$DOCKER_USER" \
   ${_env_file_args[@]+"${_env_file_args[@]}"} \
   -e DENO_DIR=/workspace/.repo-sentry/deno-cache \
+  -e GITHUB_TOKEN \
   -v "${_reports_dir}:/workspace/reports" \
   -v "${CACHE_DIR}:/workspace/.repo-sentry" \
   "$IMAGE" \

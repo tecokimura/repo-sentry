@@ -297,6 +297,12 @@ function renderFindingTable(f: ReportFinding): string[] {
   if (f.riskSignals.kev) {
     rows.push(["KEV", `悪用確認済み${f.context.kevDateAdded ? ` (${f.context.kevDateAdded})` : ""}`]);
   }
+  if (f.context.pocUrls?.length) {
+    rows.push(["PoC", `公開済み (${f.context.pocUrls.length} 件)`]);
+    for (const url of f.context.pocUrls) {
+      rows.push(["", url]);
+    }
+  }
   if (f.context.cweIds?.length) rows.push(["CWE", f.context.cweIds.join(", ")]);
   if (f.context.url) rows.push(["参考", f.context.url]);
 

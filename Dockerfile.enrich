@@ -25,6 +25,6 @@ ENV DENO_DIR=/workspace/.repo-sentry/deno-cache
 WORKDIR /workspace
 USER deno
 
-ENTRYPOINT ["deno", "run", "--allow-read=/app,/workspace", "--allow-write=/workspace/reports,/workspace/.repo-sentry", "--allow-env=DENO_DIR", "--allow-net=api.osv.dev,www.cisa.gov,api.first.org", "/app/src/sentry-enrich/cli.ts"]
+ENTRYPOINT ["deno", "run", "--allow-read=/app,/workspace", "--allow-write=/workspace/reports,/workspace/.repo-sentry", "--allow-env=DENO_DIR,GITHUB_TOKEN", "--allow-net=api.osv.dev,www.cisa.gov,api.first.org,api.github.com", "/app/src/sentry-enrich/cli.ts"]
 
 CMD ["--help"]

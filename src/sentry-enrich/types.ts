@@ -2,6 +2,11 @@ import type { Finding, ScanReport, SeveritySummary } from "../sentry-scan/types.
 
 export type DependencyType = "direct" | "transitive" | "unknown";
 
+export interface OsvReference {
+  type: string;
+  url: string;
+}
+
 export interface OsvAdvisory {
   id: string;
   aliases?: string[];
@@ -9,6 +14,13 @@ export interface OsvAdvisory {
   severity?: string;
   publishedAt?: string;
   modifiedAt?: string;
+  references?: OsvReference[];
+}
+
+export interface PocReference {
+  url: string;
+  /** osv: OSV references 由来 / github-search: GitHub Search API 由来 */
+  source: "osv" | "github-search";
 }
 
 export interface KevEntry {
@@ -34,6 +46,7 @@ export interface EnrichedFinding extends Finding {
   epss?: EpssScore;
   canonicalReference?: string;
   invalidReferences?: string[];
+  pocReferences?: PocReference[];
 }
 
 export interface EnrichedReport {

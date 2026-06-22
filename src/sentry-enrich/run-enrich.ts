@@ -4,6 +4,7 @@ import { enrichWithOsv } from "./enrichers/osv.ts";
 import { enrichWithKev } from "./enrichers/kev.ts";
 import { enrichWithEpss } from "./enrichers/epss.ts";
 import { validateReferences } from "./enrichers/reference.ts";
+import { enrichWithGithubPoc } from "./enrichers/poc.ts";
 import { nowIso } from "../shared/utils.ts";
 import { readJsonFile } from "../shared/utils.ts";
 import { summarizeSeverities } from "../shared/utils.ts";
@@ -13,11 +14,20 @@ export async function runEnrich(request: EnrichRequest): Promise<EnrichedReport>
 
   let findings: EnrichedFinding[] = scan.findings.map((f) => ({ ...f }));
 
+  const githubToken = Deno.env.get("GITHUB_TOKEN");
+
   [findings] = await Promise.all([
     enrichWithOsv(findings)
       .then((f) => enrichWithKev(f))
       .then((f) => enrichWithEpss(f))
-      .then((f) => validateReferences(f)),
+      .then((f) => validateReferences(f))
+      .then((f) => {
+        if (githubToken !== undefined) {
+          console.error(`[sentry-enrich] GitHub PoC 検索を実行します（GITHUB_TOKEN あり）`);
+          return enrichWithGithubPoc(f, { githubToken });
+        }
+        return f;
+      }),
   ]);
 
   return {
