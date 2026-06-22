@@ -11,15 +11,17 @@
 3. **[docs/report-format.md](report-format.md)** — Phase 1（sentry-scan）出力フォーマット（Phase 3 ではない）
 4. **[docs/tool-recommendations.md](tool-recommendations.md)** — 実装前設計メモ（参考用・フェーズ番号が異なるので注意）
 
-**現在の状態（2026-06-21）**:
+**現在の状態（2026-06-22）**:
 - Phase 1（sentry-scan）: **完了**
 - Phase 2（sentry-enrich）: **完了**（OSV / KEV / EPSS / 参考 URL 検証）
-- Phase 3（sentry-report）: **ベータ版**（実案件未検証・`--plan-input` 未検証）
+- Phase 3（sentry-report）: **Stable**（実案件検証済み・`--plan-input` 検証済み）
 
 **次の優先課題**:
-1. 実案件で scan→enrich→report の通し実行（`--plan-input` 含む）
-2. 発見された課題修正 + urgency をプロンプトへ渡す改善
-3. Phase 3 Stable 宣言
+1. P3-1: executiveSummary ガード強化（immediate=0 時の「即時対応」表現を自動除去）
+2. P3-2: PoC-in-GitHub 調査（Priority 4）
+3. P3-3: 実案件を 3〜5 件流して品質確認（本格的な Stable 判定）
+4. P3-4: GitHub Actions 統合
+5. P3-5: sentry-export（PDF 生成）
 
 ---
 
@@ -278,7 +280,7 @@ Phase 2 では LLM を使用しない。外部 DB のみで補強する。
 
 enriched.json をもとに、開発チームが対応判断できる Markdown レポートを生成する。
 
-**進捗**: 初期安定版完了（scan → enrich → report パイプライン動作確認済み）
+**進捗**: **Stable**（実案件検証済み・`--plan-input` 検証済み・2026-06-22）
 
 ### 入力
 
@@ -468,11 +470,14 @@ OpenAI（デフォルト）または Ollama を選択可能（Phase 1・2 と同
 | 3 | sentry-enrich: 参考 URL 検証・canonicalReference 生成 | 完了 |
 | 4 | sentry-report: ReportInput / ReportPlan スキーマ設計 | 完了 |
 | 5 | sentry-report: Markdown 生成・Docker 実行環境 | 完了 |
-| 6 | sentry-enrich: PoC-in-GitHub 検知（OSV aliases / NVD reference から GitHub PoC 有無を確認） | 未着手 |
-| 7 | sentry-enrich: ExploitDB 連携 | 未着手 |
-| 8 | scripts: stdout/stderr 分離 + docker-run.sh 一括実行（Phase 3 Stable 後） | 未着手 |
-| 9 | GitHub Actions 統合（Phase 3 Stable 後） | 未着手 |
-| 10 | sentry-export: PDF 生成（sentry-watch より後） | 未着手 |
+| 6 | Phase 3 Stable 宣言（実案件検証・`--plan-input` 検証） | **完了** |
+| 7 | P3-1: executiveSummary ガード強化（immediate=0 時の「即時対応」表現除去） | 未着手 |
+| 8 | P3-2: sentry-enrich: PoC-in-GitHub 検知（OSV aliases / NVD reference から GitHub PoC 有無を確認） | 未着手 |
+| 9 | P3-3: 実案件 3〜5 件での品質確認 | 未着手 |
+| 10 | P3-4: GitHub Actions 統合 | 未着手 |
+| 11 | P3-5: sentry-export: PDF 生成 | 未着手 |
+| 12 | scripts: stdout/stderr 分離 + docker-run.sh 一括実行 | 未着手 |
+| 13 | sentry-enrich: ExploitDB 連携 | 未着手 |
 
 ---
 
