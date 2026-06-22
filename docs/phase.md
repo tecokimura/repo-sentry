@@ -1,6 +1,6 @@
 # repo-sentry ロードマップ
 
-最終更新: 2026-06-21
+最終更新: 2026-06-22
 
 ## このドキュメントの使い方
 
@@ -482,30 +482,43 @@ OpenAI（デフォルト）または Ollama を選択可能（Phase 1・2 と同
 
 **目的**: `scan → enrich → report` を一コマンドで通せるようにする。
 
-**方針**:
+#### 確定した方針
 
-- Unix の原則に従い **stdout = 生成ファイルパス（データ）、stderr = 人間向けメッセージ** に分離する
-- 現在は生成ファイルパスが stderr のメッセージに混じっており、スクリプト間の連携に使えない
-- 各スクリプト（docker-scan.sh / docker-enrich.sh / docker-report.sh）の末尾で生成パスを stdout に出力するよう修正する
-- `docker-run.sh` を新規作成し、`$()` でパスを受け取ってパイプラインを自動接続する
+- **stdout = 生成ファイルパス（1行のみ）**: スクリプトが生成したファイルのパスのみを stdout に出力する
+  - ファイル内容（JSON）を stdout に出すと中間ファイルが残らず、デバッグ・再実行が難しくなるため
+  - ファイルパスであれば `jq '.findings[]' "$(docker-scan.sh repo)"` や `cat "$path" | awk ...` と同等の加工が可能
+- **stderr = 進捗・エラーメッセージ**: ターミナルに表示する人間向けのメッセージはすべて stderr へ
+- **ログファイル = 詳細ログ**: stderr と同じ内容を `logs/` 配下のファイルにも書き出す（`tail -f` での追跡を想定）
+
+**パイプライン接続イメージ（確定）**:
 
 ```bash
-# 想定インターフェース
-bash scripts/docker-run.sh /path/to/project
+# 個別実行（現在のやり方を維持）
+bash scripts/docker-scan.sh /path/to/project          # stdout: "reports/.../scan_xxx.json"
+bash scripts/docker-enrich.sh reports/.../scan_xxx.json  # stdout: "reports/.../enriched_xxx.json"
+bash scripts/docker-report.sh reports/.../enriched_xxx.json
 
-# 内部動作（イメージ）
+# xargs でつなぐ（stdout を次のスクリプトの引数に渡す）
+docker-scan.sh /path/to/project | xargs docker-enrich.sh | xargs docker-report.sh
+
+# $() で受け取る（docker-run.sh 内部でこの形式を使う）
 SCAN_JSON=$(bash scripts/docker-scan.sh /path/to/project)
 ENRICHED_JSON=$(bash scripts/docker-enrich.sh "$SCAN_JSON")
 bash scripts/docker-report.sh "$ENRICHED_JSON"
 ```
 
-**実装前に確認すること**:
+#### 未確定・要検討の項目
 
-- 各スクリプトの stdout 変更が既存の利用側（CI 等）に影響しないか
-- `--plan-input` など個別オプションを使う場合は引き続き個別スクリプトで対応する方針でよいか
-- エラー時の停止・メッセージ表示の挙動を詳細に決める
+| 項目 | 内容 | 状態 |
+| --- | --- | --- |
+| ログファイルの置き場 | `logs/` を `reports/{project}/` 配下にするか、プロジェクトルート直下にするか | 未決 |
+| ログローテーション | いつ・どのタイミングで古いログを消すか（手動 / 件数 / 日付） | 未検討 |
+| ログレベル | 全メッセージを出すか、エラーのみにするか、`--verbose` で切り替えるか | 未決 |
+| エラー時の挙動 | `docker-run.sh` で途中のステップが失敗した場合、後続をスキップして何を stdout に出すか | 未決 |
+| `--plan-input` の扱い | 個別オプションを使う場合は個別スクリプト実行を推奨する方針でよいか | 要確認 |
+| CI への影響 | stdout 変更が既存の利用側（GitHub Actions 等）に影響しないか | 要確認 |
 
-**タイミング**: Phase 3 Stable 宣言後に着手する。
+**タイミング**: Phase 3 Stable 宣言後に未確定項目を整理してから実装に着手する。
 
 ---
 

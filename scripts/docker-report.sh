@@ -24,6 +24,8 @@ Options:
   OPENAI_API_KEY        OpenAI API キー
   REPORT_LLM_MODEL      Ollama モデル名 (OLLAMA_MODEL でも可)
   OLLAMA_BASE_URL       Ollama ホスト URL (OLLAMA_HOST でも可)
+  OLLAMA_CONTAINER      Ollama の Docker コンテナ名 (default: ollama-report)
+                        停止中の場合は自動起動する（OpenAI 使用時はスキップ）
   REPORTS_DIR           reports ルートディレクトリ (default: 入力ファイルの親の親)
   DOCKER_USER           Docker 実行ユーザー (default: 現在の UID:GID)
 EOF
@@ -139,6 +141,31 @@ fi
 _env_file_args=()
 if [[ -f "${ENV_FILE:-.env}" ]]; then
   _env_file_args=(--env-file "${ENV_FILE:-.env}")
+fi
+
+# Ollama コンテナの自動起動（OpenAI 使用時はスキップ）
+_provider="${REPORT_LLM_PROVIDER:-${CLEARWING_PROVIDER:-}}"
+if [[ "$_provider" != "openai" && -z "${OPENAI_API_KEY:-}" ]]; then
+  _ollama_container="${OLLAMA_CONTAINER:-ollama-report}"
+  if docker inspect "$_ollama_container" > /dev/null 2>&1; then
+    if ! docker ps --format '{{.Names}}' | grep -q "^${_ollama_container}$"; then
+      echo "[sentry-report] Ollama コンテナを起動中: ${_ollama_container}" >&2
+      docker start "$_ollama_container" > /dev/null
+      echo "[sentry-report] Ollama の起動を待機中..." >&2
+      _wait=0
+      until curl -sf "http://localhost:${OLLAMA_PORT:-11434}/api/tags" > /dev/null 2>&1 || [[ $_wait -ge 30 ]]; do
+        sleep 2
+        _wait=$(( _wait + 2 ))
+      done
+      if [[ $_wait -ge 30 ]]; then
+        echo "[sentry-report] 警告: Ollama 起動タイムアウト（接続を試みます）" >&2
+      else
+        echo "[sentry-report] Ollama 起動完了" >&2
+      fi
+    fi
+  else
+    echo "[sentry-report] 警告: Ollama コンテナ '${_ollama_container}' が見つかりません" >&2
+  fi
 fi
 
 _exit=0

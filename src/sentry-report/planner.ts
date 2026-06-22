@@ -53,7 +53,7 @@ function buildUserPrompt(input: ReportInput): string {
     summary: input.summary,
     findings: input.findings.map(compactFinding),
   };
-  return `以下のスキャン結果を分析して ReportPlan JSON を生成してください。\n\n${
+  return `下記のスキャン結果データに基づき、system prompt のスキーマ通りの JSON を出力してください。説明文は不要です。\n\n${
     JSON.stringify(compact, null, 2)
   }`;
 }
@@ -93,19 +93,23 @@ async function callChatCompletion(
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
 
+  const body: Record<string, unknown> = {
+    model,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+    stream: false,
+    temperature: 0.3,
+    max_tokens: 2000,
+  };
+
+  body["response_format"] = { type: "json_object" };
+
   const res = await fetch(`${host}/v1/chat/completions`, {
     method: "POST",
     headers,
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      stream: false,
-      temperature: 0.3,
-      max_tokens: 2000,
-    }),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(600000),
   });
 
