@@ -1,6 +1,13 @@
 import type { ReportPlan, PlanAction, PlanDeferral } from "../plan.ts";
 import type { ReportInput, ReportFinding, ReportSummary } from "../types.ts";
-import { filterAvailableVersions } from "../semver.ts";
+import { filterAvailableVersions, parseSemVer, cmpSemVer } from "../semver.ts";
+
+function semverGt(a: string, b: string): boolean {
+  const pa = parseSemVer(a);
+  const pb = parseSemVer(b);
+  if (!pa || !pb) return a > b;
+  return cmpSemVer(pa, pb) > 0;
+}
 
 export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): string {
   const lines: string[] = [];
@@ -113,23 +120,30 @@ export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): stri
   }
 
   // 6. Fix Guide
+  // 同パッケージに複数の CVE がある場合、最大の recommendedVersion を採用する
   const fixable = input.findings.filter((f) => f.recommendedAction.fixAvailable);
   if (fixable.length > 0) {
     lines.push("## 修正ガイド");
     lines.push("");
     lines.push("| パッケージ | 現在バージョン | 推奨バージョン | 修正コマンド |");
     lines.push("| --- | --- | --- | --- |");
-    const seen = new Set<string>();
+    const fixMap = new Map<string, { pkg: string; cur: string; rec: string; cmd: string }>();
     for (const f of fixable) {
       const key = `${f.package?.name ?? ""}@${f.package?.version ?? ""}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
       const pkg = f.package?.name ?? "—";
       const cur = f.package?.version ?? "—";
-      const rec = f.recommendedAction.recommendedVersion ?? "—";
-      const rawCmd = f.recommendedAction.fixCommand ?? f.recommendedAction.command;
-      const cmd = rawCmd ? `\`${escMd(rawCmd)}\`` : "—";
-      lines.push(`| ${escMd(pkg)} | ${escMd(cur)} | ${escMd(rec)} | ${cmd} |`);
+      const rec = f.recommendedAction.recommendedVersion ?? "";
+      const rawCmd = f.recommendedAction.fixCommand ?? f.recommendedAction.command ?? "";
+      if (!fixMap.has(key)) {
+        fixMap.set(key, { pkg, cur, rec, cmd: rawCmd });
+      } else if (rec && semverGt(rec, fixMap.get(key)!.rec)) {
+        fixMap.set(key, { pkg, cur, rec, cmd: rawCmd });
+      }
+    }
+    for (const { pkg, cur, rec, cmd } of fixMap.values()) {
+      const recDisplay = rec || "—";
+      const cmdDisplay = cmd ? `\`${escMd(cmd)}\`` : "—";
+      lines.push(`| ${escMd(pkg)} | ${escMd(cur)} | ${escMd(recDisplay)} | ${cmdDisplay} |`);
     }
     lines.push("");
   }
