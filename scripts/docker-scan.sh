@@ -125,11 +125,13 @@ CACHE_DIR="$(cd "$CACHE_DIR" && pwd -P)"
 # _target_display: レポート本文用（省略なし）
 # _target_basename: サブディレクトリ名用（英数字/_/-/. のみ、40文字以内）
 # _short_name: ファイル名プレフィックス（最初の_区切り要素、小文字、12文字以内）
-# _hash: _target_basenameのsha256頭4文字（大文字）
+# _hash: プロジェクト名先頭4文字（英数大文字）+ sha256末尾2桁（大文字）= 最大6文字
 _target_display=$(basename "$TARGET_PATH")
 _target_basename=$(printf '%s' "$_target_display" | tr -cd 'A-Za-z0-9._-' | cut -c1-40)
 _short_name=$(printf '%s' "$_target_basename" | cut -d'_' -f1 | tr 'A-Z' 'a-z' | cut -c1-12)
-_hash=$(printf '%s' "$_target_basename" | sha256sum | tr 'a-f' 'A-F' | cut -c1-4)
+_name_prefix=$(printf '%s' "$_target_basename" | tr 'a-z' 'A-Z' | tr -cd 'A-Z0-9' | cut -c1-4)
+_sha_suffix=$(printf '%s' "$_target_basename" | sha256sum | cut -c63-64 | tr 'a-f' 'A-F')
+_hash="${_name_prefix}${_sha_suffix}"
 REPORT_NAME="${REPORT_NAME:-${_target_basename}}"
 _suffix_part="${REPORT_SUFFIX:+_${REPORT_SUFFIX}}"
 
