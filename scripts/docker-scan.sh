@@ -28,7 +28,10 @@ repo-sentry CLI に直接渡せるオプション (--flag=value 形式):
   --artifacts-dir=PATH  raw scanner output (gitleaks/trivy JSON) の保存先
 
 環境変数でデフォルト値を変更できます (CLI オプションが優先):
-  TOOLS, FORMAT, SBOM, REPO, REPORT_NAME, REPORTS_DIR, CACHE_DIR, REPORT_DATE, DOCKER_USER
+  TOOLS, FORMAT, SBOM, REPO, REPORT_NAME, REPORTS_DIR, CACHE_DIR, DOCKER_USER
+  DATE_FORMAT    ファイル名のタイムスタンプ形式 (default: hour)
+                 none: なし / date: YYYYMMDD / datetime: YYYYMMDD-HHMM / hour: YYMMDDHH
+  REPORT_DATE    タイムスタンプ文字列を直接指定（DATE_FORMAT より優先）
 EOF
 }
 
@@ -39,7 +42,14 @@ REPORTS_DIR="${REPORTS_DIR:-$PWD/reports}"
 CACHE_DIR="${CACHE_DIR:-$PWD/.repo-sentry}"
 TOOLS="${TOOLS:-gitleaks,trivy}"
 FORMAT="${FORMAT:-markdown}"
-REPORT_DATE="${REPORT_DATE:-$(date +%y%m%d%H)}"
+if [[ -z "${REPORT_DATE:-}" ]]; then
+  case "${DATE_FORMAT:-hour}" in
+    none)     REPORT_DATE="" ;;
+    date)     REPORT_DATE="$(date +%Y%m%d)" ;;
+    datetime) REPORT_DATE="$(date +%Y%m%d-%H%M)" ;;
+    *)        REPORT_DATE="$(date +%y%m%d%H)" ;;
+  esac
+fi
 REPORT_NAME="${REPORT_NAME:-}"
 REPORT_SUFFIX="${REPORT_SUFFIX:-}"
 DOCKER_USER="${DOCKER_USER:-$(id -u):$(id -g)}"

@@ -22,15 +22,24 @@ Options:
   GITHUB_TOKEN          GitHub Personal Access Token（スコープ不要）
                         設定すると CVE ごとに GitHub Search API で PoC リポジトリを検索する
                         未設定時は OSV references からの PoC 抽出のみ実行
+  DATE_FORMAT           ファイル名のタイムスタンプ形式 (default: hour)
+                        none: なし / date: YYYYMMDD / datetime: YYYYMMDD-HHMM / hour: YYMMDDHH
+  REPORT_DATE           タイムスタンプ文字列を直接指定（DATE_FORMAT より優先）
   REPORTS_DIR           reports ルートディレクトリ (default: 入力ファイルの親の親)
-  REPORT_DATE           日時文字列 YYMMDDHH (default: 現在時刻)
   CACHE_DIR             Deno キャッシュディレクトリ (default: .repo-sentry/)
   DOCKER_USER           Docker 実行ユーザー (default: 現在の UID:GID)
 EOF
 }
 
 IMAGE="${REPO_SENTRY_ENRICH_IMAGE:-repo-sentry-enrich:local}"
-REPORT_DATE="${REPORT_DATE:-$(date +%y%m%d%H)}"
+if [[ -z "${REPORT_DATE:-}" ]]; then
+  case "${DATE_FORMAT:-hour}" in
+    none)     REPORT_DATE="" ;;
+    date)     REPORT_DATE="$(date +%Y%m%d)" ;;
+    datetime) REPORT_DATE="$(date +%Y%m%d-%H%M)" ;;
+    *)        REPORT_DATE="$(date +%y%m%d%H)" ;;
+  esac
+fi
 DOCKER_USER="${DOCKER_USER:-$(id -u):$(id -g)}"
 
 INPUT_FILE=""

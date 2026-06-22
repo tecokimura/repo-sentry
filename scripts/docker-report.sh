@@ -26,13 +26,23 @@ Options:
   OLLAMA_BASE_URL       Ollama ホスト URL (OLLAMA_HOST でも可)
   OLLAMA_CONTAINER      Ollama の Docker コンテナ名 (default: ollama-report)
                         停止中の場合は自動起動する（OpenAI 使用時はスキップ）
+  DATE_FORMAT           ファイル名のタイムスタンプ形式 (default: hour)
+                        none: なし / date: YYYYMMDD / datetime: YYYYMMDD-HHMM / hour: YYMMDDHH
+  REPORT_DATE           タイムスタンプ文字列を直接指定（DATE_FORMAT より優先）
   REPORTS_DIR           reports ルートディレクトリ (default: 入力ファイルの親の親)
   DOCKER_USER           Docker 実行ユーザー (default: 現在の UID:GID)
 EOF
 }
 
 IMAGE="${REPO_SENTRY_REPORT_IMAGE:-repo-sentry-report:local}"
-REPORT_DATE="${REPORT_DATE:-$(date +%y%m%d%H)}"
+if [[ -z "${REPORT_DATE:-}" ]]; then
+  case "${DATE_FORMAT:-hour}" in
+    none)     REPORT_DATE="" ;;
+    date)     REPORT_DATE="$(date +%Y%m%d)" ;;
+    datetime) REPORT_DATE="$(date +%Y%m%d-%H%M)" ;;
+    *)        REPORT_DATE="$(date +%y%m%d%H)" ;;
+  esac
+fi
 DOCKER_USER="${DOCKER_USER:-$(id -u):$(id -g)}"
 
 INPUT_FILE=""
