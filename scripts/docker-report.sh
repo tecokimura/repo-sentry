@@ -98,7 +98,7 @@ INPUT_BASE="$(basename "$INPUT_FILE" .json)"
 _stripped="${INPUT_BASE#enriched_}"
 _short="${_stripped%%_*}"
 _after_short="${_stripped#${_short}_}"
-_hash="${_after_short:0:6}"
+_hash="${_after_short:0:8}"
 
 # reports ルートを決定
 if [[ -n "${REPORTS_DIR:-}" ]]; then
