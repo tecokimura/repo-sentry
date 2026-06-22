@@ -470,8 +470,42 @@ OpenAI（デフォルト）または Ollama を選択可能（Phase 1・2 と同
 | 5 | sentry-report: Markdown 生成・Docker 実行環境 | 完了 |
 | 6 | sentry-enrich: PoC-in-GitHub 検知（OSV aliases / NVD reference から GitHub PoC 有無を確認） | 未着手 |
 | 7 | sentry-enrich: ExploitDB 連携 | 未着手 |
-| 8 | GitHub Actions 統合（Phase 3 Stable 後） | 未着手 |
-| 9 | sentry-export: PDF 生成（sentry-watch より後） | 未着手 |
+| 8 | scripts: stdout/stderr 分離 + docker-run.sh 一括実行（Phase 3 Stable 後） | 未着手 |
+| 9 | GitHub Actions 統合（Phase 3 Stable 後） | 未着手 |
+| 10 | sentry-export: PDF 生成（sentry-watch より後） | 未着手 |
+
+---
+
+## 実装前に詳細確認が必要な項目
+
+### scripts: stdout/stderr 分離 + docker-run.sh 一括実行
+
+**目的**: `scan → enrich → report` を一コマンドで通せるようにする。
+
+**方針**:
+
+- Unix の原則に従い **stdout = 生成ファイルパス（データ）、stderr = 人間向けメッセージ** に分離する
+- 現在は生成ファイルパスが stderr のメッセージに混じっており、スクリプト間の連携に使えない
+- 各スクリプト（docker-scan.sh / docker-enrich.sh / docker-report.sh）の末尾で生成パスを stdout に出力するよう修正する
+- `docker-run.sh` を新規作成し、`$()` でパスを受け取ってパイプラインを自動接続する
+
+```bash
+# 想定インターフェース
+bash scripts/docker-run.sh /path/to/project
+
+# 内部動作（イメージ）
+SCAN_JSON=$(bash scripts/docker-scan.sh /path/to/project)
+ENRICHED_JSON=$(bash scripts/docker-enrich.sh "$SCAN_JSON")
+bash scripts/docker-report.sh "$ENRICHED_JSON"
+```
+
+**実装前に確認すること**:
+
+- 各スクリプトの stdout 変更が既存の利用側（CI 等）に影響しないか
+- `--plan-input` など個別オプションを使う場合は引き続き個別スクリプトで対応する方針でよいか
+- エラー時の停止・メッセージ表示の挙動を詳細に決める
+
+**タイミング**: Phase 3 Stable 宣言後に着手する。
 
 ---
 
