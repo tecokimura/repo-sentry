@@ -53,6 +53,19 @@ Do NOT output any explanation, prose, markdown, or code blocks. Output ONLY the 
 - deferredItems: urgency="deferred" の findings を対象とする。
 - notableRisks: 複数 findings に共通するパターン（同一ライブラリの複数 CVE、同一 category の集中など）。なければ空配列。
 
+## deferredItems の deferReason の書き方
+
+各 finding の deferReason には、以下のうち最低 1 つをそのパッケージ固有の事実に基づいて記載すること:
+
+- EPSS が低い（epss の値が低く、悪用確率が低い）
+- KEV 未登録（実際に悪用された記録がない）
+- severity が Medium / Low / Unknown
+- direct dependency ではない（transitive 依存のため影響が間接的）
+- 影響機能が限定的（affectedFeatures から判断）
+- 修正版はあるが即時対応条件（critical / KEV）ではない
+
+**重要**: 複数の finding で同じ deferReason の文章を使わないこと。パッケージ名・攻撃カテゴリ・EPSS・影響機能など、その finding 固有の情報を必ず含めること。
+
 ## Your responsibilities
 
 Write about:

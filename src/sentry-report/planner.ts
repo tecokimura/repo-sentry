@@ -68,11 +68,14 @@ function compactFinding(f: ReportFinding): Record<string, unknown> {
     riskSignals: {
       severity: f.riskSignals.severity,
       epss: f.riskSignals.epss,
+      epssPercentile: f.riskSignals.epssPercentile,
       kev: f.riskSignals.kev,
       hasFixedVersion: f.riskSignals.hasFixedVersion,
       priorityScore: f.riskSignals.priorityScore,
     },
     urgency: f.recommendedAction.urgency,
+    fixAvailable: f.recommendedAction.fixAvailable,
+    recommendedVersion: f.recommendedAction.recommendedVersion,
     context: {
       title: f.context.title,
       attackCategory: f.context.attackCategory,
