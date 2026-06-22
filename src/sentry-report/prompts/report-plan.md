@@ -55,16 +55,22 @@ Do NOT output any explanation, prose, markdown, or code blocks. Output ONLY the 
 
 ## deferredItems の deferReason の書き方
 
-各 finding の deferReason には、以下のうち最低 1 つをそのパッケージ固有の事実に基づいて記載すること:
+**フォーマット**: `{パッケージ名} は〜のため後回しで問題ない。`
 
-- EPSS が低い（epss の値が低く、悪用確率が低い）
-- KEV 未登録（実際に悪用された記録がない）
+deferReason は必ずパッケージ名（package.name）で書き始めること。
+そのうえで、以下のうち最低 1 つをその finding の実際の状況に基づいて記載すること:
+
+- KEV 未登録のため実際の悪用事例がない
+- EPSS が低く悪用確率が低い
 - severity が Medium / Low / Unknown
-- direct dependency ではない（transitive 依存のため影響が間接的）
-- 影響機能が限定的（affectedFeatures から判断）
-- 修正版はあるが即時対応条件（critical / KEV）ではない
+- 攻撃が成立する条件が限定的（attackCategory や affectedFeatures から判断）
+- 修正版はあるが critical・KEV の即時対応条件には該当しない
 
-**重要**: 複数の finding で同じ deferReason の文章を使わないこと。パッケージ名・攻撃カテゴリ・EPSS・影響機能など、その finding 固有の情報を必ず含めること。
+**例（良い）**:
+- `guzzlehttp/guzzle は KEV 未登録かつ EPSS が低く、攻撃が実際に確認された事例がないため後回しで問題ない。`
+- `league/commonmark は XSS の脆弱性だが、affectedFeatures がコメント表示機能に限定されており影響範囲が狭いため後回しで問題ない。`
+
+**禁止**: 「この脆弱性は中リスクであり、悪用される可能性が低いため」のような汎用文は使わないこと。複数の finding で同じ文章を使わないこと。
 
 ## Your responsibilities
 
@@ -78,4 +84,4 @@ Do NOT write about:
 - CVE ID や GHSA ID の列挙
 - バージョン番号の記載
 - 修正コマンドの生成
-- EPSS スコアや KEV ステータスの数値
+- EPSS の具体的な数値（「低い」「高い」などの定性的言及は可）
