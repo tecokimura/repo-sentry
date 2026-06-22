@@ -3,11 +3,12 @@ import type { EnrichedFinding, OsvAdvisory, OsvReference, PocInfo, PocSource } f
 const OSV_VULNS_API = "https://api.osv.dev/v1/vulns";
 
 // GitHub URL で PoC と判断するパターン（medium confidence）
-const POC_GITHUB_PATTERNS = [
-  /\/CVE-\d{4}-\d+/i,
-  /[-_/]poc($|[-_/])/i,
-  /[-_/]exploit($|[-_/])/i,
-];
+// リポジトリ名（owner/repo の repo 部分）にマッチさせる。
+// パス深部の一致（CVE データベース・アドバイザリ集など）を除外するため先頭から照合する。
+// リポジトリ名（owner/repo の repo 部分）に CVE ID または "poc" が単語として含まれる場合に PoC と判定。
+// パス深部の一致（CVEProject/cvelistV5 等）は除外。"poc" は [-_] で区切られた単語にのみマッチ。
+const POC_GITHUB_REPO_RE =
+  /^https:\/\/github\.com\/[^/]+\/(?:CVE-\d{4}-\d+|(?:[^/]*[-_])?poc(?:[-_][^/]*)?$)/i;
 
 export async function enrichWithOsv(findings: EnrichedFinding[]): Promise<EnrichedFinding[]> {
   return await Promise.all(findings.map(async (f) => {
@@ -76,10 +77,7 @@ function buildPocInfo(refs: OsvReference[]): PocInfo | undefined {
     if (ref.type === "EXPLOIT") {
       seen.add(ref.url);
       sources.push({ url: ref.url, source: "osv-reference", reason: "OSV reference type EXPLOIT" });
-    } else if (
-      ref.url.includes("github.com") &&
-      POC_GITHUB_PATTERNS.some((p) => p.test(ref.url))
-    ) {
+    } else if (POC_GITHUB_REPO_RE.test(ref.url)) {
       seen.add(ref.url);
       sources.push({ url: ref.url, source: "osv-reference", reason: "OSV reference GitHub PoC URL pattern" });
     }
