@@ -2,3 +2,7 @@ reports/
 .repo-sentry/
 *.log
 .env
+# examples/ の実案件ファイルは機密情報を含むため除外
+examples/**/*.json
+examples/**/*.md
+!examples/README.md

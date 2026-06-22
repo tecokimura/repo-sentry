@@ -17,11 +17,10 @@
 - Phase 3（sentry-report）: **Stable**（実案件検証済み・`--plan-input` 検証済み）
 
 **次の優先課題**:
-1. P3-1: executiveSummary ガード強化（immediate=0 時の「即時対応」表現を自動除去）
-2. P3-2: PoC-in-GitHub 調査（Priority 4）
-3. P3-3: 実案件を 3〜5 件流して品質確認（本格的な Stable 判定）
-4. P3-4: GitHub Actions 統合
-5. P3-5: sentry-export（PDF 生成）
+1. P3-2: PoC-in-GitHub 調査（sentry-enrich で GitHub PoC 有無を検知）
+2. P3-3: 実案件 3〜5 件での品質確認
+3. P3-4: GitHub Actions 統合
+4. P3-5: sentry-export（PDF 生成）
 
 ---
 
@@ -471,7 +470,7 @@ OpenAI（デフォルト）または Ollama を選択可能（Phase 1・2 と同
 | 4 | sentry-report: ReportInput / ReportPlan スキーマ設計 | 完了 |
 | 5 | sentry-report: Markdown 生成・Docker 実行環境 | 完了 |
 | 6 | Phase 3 Stable 宣言（実案件検証・`--plan-input` 検証） | **完了** |
-| 7 | P3-1: executiveSummary ガード強化（immediate=0 時の「即時対応」表現除去） | 未着手 |
+| 7 | P3-1: executiveSummary ガード強化（immediate=0 時の「即時対応」表現除去） | **完了** |
 | 8 | P3-2: sentry-enrich: PoC-in-GitHub 検知（OSV aliases / NVD reference から GitHub PoC 有無を確認） | 未着手 |
 | 9 | P3-3: 実案件 3〜5 件での品質確認 | 未着手 |
 | 10 | P3-4: GitHub Actions 統合 | 未着手 |
