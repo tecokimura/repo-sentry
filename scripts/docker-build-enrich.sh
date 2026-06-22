@@ -8,7 +8,7 @@ for _arg in "$@"; do
 done
 
 docker build \
-  "${_no_cache_arg[@]}" \
+  ${_no_cache_arg[@]+"${_no_cache_arg[@]}"} \
   --build-arg DENO_VERSION="${DENO_VERSION:-2.5.6}" \
   -f Dockerfile.enrich \
   -t "$IMAGE" \

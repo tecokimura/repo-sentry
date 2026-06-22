@@ -8,7 +8,7 @@ for _arg in "$@"; do
 done
 
 docker build \
-  "${_no_cache_arg[@]}" \
+  ${_no_cache_arg[@]+"${_no_cache_arg[@]}"} \
   --build-arg DENO_VERSION="${DENO_VERSION:-2.5.6}" \
   --build-arg GITLEAKS_VERSION="${GITLEAKS_VERSION:-8.30.1}" \
   --build-arg TRIVY_VERSION="${TRIVY_VERSION:-0.70.0}" \
