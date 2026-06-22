@@ -53,24 +53,6 @@ Do NOT output any explanation, prose, markdown, or code blocks. Output ONLY the 
 - deferredItems: urgency="deferred" の findings を対象とする。
 - notableRisks: 複数 findings に共通するパターン（同一ライブラリの複数 CVE、同一 category の集中など）。なければ空配列。
 
-## deferredItems の deferReason の書き方
-
-**フォーマット**: `{パッケージ名} は〜のため後回しで問題ない。`
-
-deferReason は必ずパッケージ名（package.name）で書き始めること。
-そのうえで、以下のうち最低 1 つをその finding の実際の状況に基づいて記載すること:
-
-- KEV 未登録のため実際の悪用事例がない
-- EPSS が低く悪用確率が低い
-- severity が Medium / Low / Unknown
-- 攻撃が成立する条件が限定的（attackCategory や affectedFeatures から判断）
-- 修正版はあるが critical・KEV の即時対応条件には該当しない
-
-**例（良い）**:
-- `guzzlehttp/guzzle は KEV 未登録かつ EPSS が低く、攻撃が実際に確認された事例がないため後回しで問題ない。`
-- `league/commonmark は XSS の脆弱性だが、affectedFeatures がコメント表示機能に限定されており影響範囲が狭いため後回しで問題ない。`
-
-**禁止**: 「この脆弱性は中リスクであり、悪用される可能性が低いため」のような汎用文は使わないこと。複数の finding で同じ文章を使わないこと。
 
 ## Your responsibilities
 

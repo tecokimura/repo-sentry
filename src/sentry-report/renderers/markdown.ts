@@ -173,6 +173,30 @@ function sanitizeReason(
   return text;
 }
 
+// deferred 理由を ReportFinding のデータから決定論的に生成（AI に委ねない）
+function buildDeferReason(f: ReportFinding): string {
+  const kev  = f.riskSignals.kev;
+  const epss = f.riskSignals.epss;
+  const sev  = f.riskSignals.severity?.toLowerCase();
+  const dep  = f.package?.dependencyType;
+  const feat = f.context.affectedFeatures;
+  const pkg  = f.package?.name ?? f.context.title;
+
+  if (!kev && (epss === undefined || epss < 0.01)) {
+    return `${pkg} は KEV 未登録かつ悪用可能性が低いため後回し可能。`;
+  }
+  if (dep === "transitive") {
+    return `${pkg} は transitive 依存のため影響が間接的であり後回し可能。`;
+  }
+  if (feat && feat.length > 0) {
+    return `${pkg} は影響範囲が ${feat.join("・")} に限定されるため後回し可能。`;
+  }
+  if (sev === "low" || sev === "unknown") {
+    return `${pkg} は severity が ${sev} であり即時対応条件に該当しないため後回し可能。`;
+  }
+  return `${pkg} は修正版が提供されているが critical・KEV の即時対応条件には該当しないため後回し可能。`;
+}
+
 // finding を planLookup の AI テキストで補完してレンダー（セクション整合性チェック付き）
 function renderFindingWithPlan(
   f: ReportFinding,
@@ -183,8 +207,7 @@ function renderFindingWithPlan(
   if (!planItem) return renderFindingFallback(f);
 
   if (section === "deferred") {
-    const rawText = "deferReason" in planItem ? planItem.deferReason : planItem.reason;
-    const text = sanitizeReason(rawText, "deferred", f.findingId);
+    const text = buildDeferReason(f);
     return renderDeferralSection({ findingId: planItem.findingId, title: planItem.title, deferReason: text }, f);
   } else {
     const rawText = "reason" in planItem ? planItem.reason : planItem.deferReason;
