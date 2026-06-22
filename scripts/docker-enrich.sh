@@ -31,6 +31,15 @@ Options:
 EOF
 }
 
+# DATE_FORMAT / REPORT_DATE はホスト側で使うため .env を直接読む
+_env_file="${ENV_FILE:-.env}"
+if [[ -z "${DATE_FORMAT:-}" && -f "$_env_file" ]]; then
+  DATE_FORMAT="$(grep -E '^DATE_FORMAT=' "$_env_file" | tail -1 | cut -d= -f2-)"
+fi
+if [[ -z "${REPORT_DATE:-}" && -f "$_env_file" ]]; then
+  REPORT_DATE="$(grep -E '^REPORT_DATE=' "$_env_file" | tail -1 | cut -d= -f2-)"
+fi
+
 IMAGE="${REPO_SENTRY_ENRICH_IMAGE:-repo-sentry-enrich:local}"
 if [[ -z "${REPORT_DATE:-}" ]]; then
   case "${DATE_FORMAT:-hour}" in
