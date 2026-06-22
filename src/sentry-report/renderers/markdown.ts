@@ -297,10 +297,12 @@ function renderFindingTable(f: ReportFinding): string[] {
   if (f.riskSignals.kev) {
     rows.push(["KEV", `悪用確認済み${f.context.kevDateAdded ? ` (${f.context.kevDateAdded})` : ""}`]);
   }
-  if (f.context.pocUrls?.length) {
-    rows.push(["PoC", `公開済み (${f.context.pocUrls.length} 件)`]);
-    for (const url of f.context.pocUrls) {
-      rows.push(["", url]);
+  if (f.context.poc) {
+    const { confidence, sources } = f.context.poc;
+    const badge = confidence === "high" ? "⚠ 高信頼度" : confidence === "medium" ? "中信頼度" : "低信頼度";
+    rows.push(["PoC", `公開済み [${badge}] (${sources.length} 件)`]);
+    for (const s of sources) {
+      rows.push(["", s.url]);
     }
   }
   if (f.context.cweIds?.length) rows.push(["CWE", f.context.cweIds.join(", ")]);

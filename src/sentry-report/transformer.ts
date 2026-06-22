@@ -150,8 +150,11 @@ function buildContext(f: EnrichedFinding): FindingContext {
     if (f.clearwingMemo)      ctx.affectedFeatures = splitLines(f.clearwingMemo);
   }
 
-  if (f.pocReferences && f.pocReferences.length > 0) {
-    ctx.pocUrls = f.pocReferences.map((r) => r.url);
+  if (f.poc?.found && f.poc.sources.length > 0) {
+    ctx.poc = {
+      confidence: f.poc.confidence,
+      sources: f.poc.sources.map((s) => ({ url: s.url, source: s.source, reason: s.reason })),
+    };
   }
 
   return ctx;

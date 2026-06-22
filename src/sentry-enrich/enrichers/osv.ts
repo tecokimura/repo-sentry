@@ -1,8 +1,8 @@
-import type { EnrichedFinding, OsvAdvisory, OsvReference, PocReference } from "../types.ts";
+import type { EnrichedFinding, OsvAdvisory, OsvReference, PocInfo, PocSource } from "../types.ts";
 
 const OSV_VULNS_API = "https://api.osv.dev/v1/vulns";
 
-// GitHub URL でPoC と判断するパターン
+// GitHub URL で PoC と判断するパターン（medium confidence）
 const POC_GITHUB_PATTERNS = [
   /\/CVE-\d{4}-\d+/i,
   /[-_/]poc($|[-_/])/i,
@@ -15,11 +15,11 @@ export async function enrichWithOsv(findings: EnrichedFinding[]): Promise<Enrich
     if (!id) return f;
     const result = await fetchOsvAdvisory(id);
     if (!result) return f;
-    const { advisory, pocRefs } = result;
+    const { advisory, poc } = result;
     return {
       ...f,
       osv: advisory,
-      ...(pocRefs.length > 0 ? { pocReferences: pocRefs } : {}),
+      ...(poc ? { poc } : {}),
     };
   }));
 }
@@ -31,7 +31,7 @@ function findOsvId(identifiers?: string[]): string | undefined {
 
 async function fetchOsvAdvisory(
   id: string,
-): Promise<{ advisory: OsvAdvisory; pocRefs: PocReference[] } | undefined> {
+): Promise<{ advisory: OsvAdvisory; poc?: PocInfo } | undefined> {
   try {
     const res = await fetch(`${OSV_VULNS_API}/${id}`);
     if (!res.ok) return undefined;
@@ -49,7 +49,7 @@ async function fetchOsvAdvisory(
       url: r.url,
     }));
 
-    const pocRefs = extractPocFromReferences(references);
+    const poc = buildPocInfo(references);
 
     const advisory: OsvAdvisory = {
       id: vuln.id,
@@ -60,29 +60,33 @@ async function fetchOsvAdvisory(
       references,
     };
 
-    return { advisory, pocRefs };
+    return { advisory, poc };
   } catch {
     return undefined;
   }
 }
 
-function extractPocFromReferences(refs: OsvReference[]): PocReference[] {
+function buildPocInfo(refs: OsvReference[]): PocInfo | undefined {
   const seen = new Set<string>();
-  const result: PocReference[] = [];
+  const sources: PocSource[] = [];
 
   for (const ref of refs) {
     if (seen.has(ref.url)) continue;
 
-    const isExploit = ref.type === "EXPLOIT";
-    const isGithubPoc =
-      ref.url.includes("github.com") &&
-      POC_GITHUB_PATTERNS.some((p) => p.test(ref.url));
-
-    if (isExploit || isGithubPoc) {
+    if (ref.type === "EXPLOIT") {
       seen.add(ref.url);
-      result.push({ url: ref.url, source: "osv" });
+      sources.push({ url: ref.url, source: "osv-reference", reason: "OSV reference type EXPLOIT" });
+    } else if (
+      ref.url.includes("github.com") &&
+      POC_GITHUB_PATTERNS.some((p) => p.test(ref.url))
+    ) {
+      seen.add(ref.url);
+      sources.push({ url: ref.url, source: "osv-reference", reason: "OSV reference GitHub PoC URL pattern" });
     }
   }
 
-  return result;
+  if (sources.length === 0) return undefined;
+
+  const confidence = sources.some((s) => s.reason.includes("EXPLOIT")) ? "high" : "medium";
+  return { found: true, confidence, sources };
 }

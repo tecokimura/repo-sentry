@@ -76,7 +76,9 @@ function compactFinding(f: ReportFinding): Record<string, unknown> {
     urgency: f.recommendedAction.urgency,
     fixAvailable: f.recommendedAction.fixAvailable,
     recommendedVersion: f.recommendedAction.recommendedVersion,
-    pocAvailable: (f.context.pocUrls?.length ?? 0) > 0,
+    poc: f.context.poc
+      ? { found: true, confidence: f.context.poc.confidence }
+      : undefined,
     context: {
       title: f.context.title,
       attackCategory: f.context.attackCategory,

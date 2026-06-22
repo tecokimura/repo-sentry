@@ -17,10 +17,18 @@ export interface OsvAdvisory {
   references?: OsvReference[];
 }
 
-export interface PocReference {
+export type PocConfidence = "high" | "medium" | "low";
+
+export interface PocSource {
   url: string;
-  /** osv: OSV references 由来 / github-search: GitHub Search API 由来 */
-  source: "osv" | "github-search";
+  source: "osv-reference" | "github-search";
+  reason: string;
+}
+
+export interface PocInfo {
+  found: boolean;
+  confidence: PocConfidence;
+  sources: PocSource[];
 }
 
 export interface KevEntry {
@@ -46,7 +54,7 @@ export interface EnrichedFinding extends Finding {
   epss?: EpssScore;
   canonicalReference?: string;
   invalidReferences?: string[];
-  pocReferences?: PocReference[];
+  poc?: PocInfo;
 }
 
 export interface EnrichedReport {

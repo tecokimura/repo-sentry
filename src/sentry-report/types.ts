@@ -44,7 +44,10 @@ export interface FindingContext {
   impact?: string[];
   affectedFeatures?: string[];
   analysisSource?: "clearwing";
-  pocUrls?: string[];
+  poc?: {
+    confidence: "high" | "medium" | "low";
+    sources: Array<{ url: string; source: string; reason: string }>;
+  };
 }
 
 export interface ReportFinding {

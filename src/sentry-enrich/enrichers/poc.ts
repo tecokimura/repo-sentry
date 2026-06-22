@@ -1,4 +1,4 @@
-import type { EnrichedFinding, PocReference } from "../types.ts";
+import type { EnrichedFinding, PocInfo, PocSource } from "../types.ts";
 
 const GITHUB_SEARCH_API = "https://api.github.com/search/repositories";
 
@@ -21,15 +21,20 @@ export async function enrichWithGithubPoc(
 
   for (const f of findings) {
     const cveId = findCveId(f.identifiers);
-    if (!cveId || (f.pocReferences && f.pocReferences.length > 0)) {
+    if (!cveId || (f.poc && f.poc.sources.length > 0)) {
       results.push(f);
       continue;
     }
 
-    const found = await searchGithubPoc(cveId, config.githubToken);
-    if (found.length > 0) {
-      const existing = f.pocReferences ?? [];
-      results.push({ ...f, pocReferences: [...existing, ...found] });
+    const newSources = await searchGithubPoc(cveId, config.githubToken);
+    if (newSources.length > 0) {
+      const existing = f.poc;
+      const merged: PocInfo = {
+        found: true,
+        confidence: existing?.confidence ?? "low",
+        sources: [...(existing?.sources ?? []), ...newSources],
+      };
+      results.push({ ...f, poc: merged });
     } else {
       results.push(f);
     }
@@ -48,7 +53,7 @@ function findCveId(identifiers?: string[]): string | undefined {
 async function searchGithubPoc(
   cveId: string,
   token?: string,
-): Promise<PocReference[]> {
+): Promise<PocSource[]> {
   try {
     const q = encodeURIComponent(`${cveId} poc exploit in:name,description`);
     const url = `${GITHUB_SEARCH_API}?q=${q}&sort=stars&order=desc&per_page=3`;
@@ -71,7 +76,11 @@ async function searchGithubPoc(
 
     return (data.items ?? [])
       .filter((item) => isPocRepo(item.full_name, cveId))
-      .map((item) => ({ url: item.html_url, source: "github-search" as const }));
+      .map((item) => ({
+        url: item.html_url,
+        source: "github-search" as const,
+        reason: `GitHub Search: "${cveId}" にマッチ`,
+      }));
   } catch {
     return [];
   }
