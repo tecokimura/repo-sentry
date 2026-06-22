@@ -173,10 +173,10 @@ docker run --rm \
   --user "$DOCKER_USER" \
   ${_env_file_args[@]+"${_env_file_args[@]}"} \
   -e DENO_DIR=/workspace/.repo-sentry/deno-cache \
-  -e OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
-  -e REPORT_LLM_PROVIDER="${REPORT_LLM_PROVIDER:-${CLEARWING_PROVIDER:-}}" \
-  -e REPORT_LLM_MODEL="${REPORT_LLM_MODEL:-${OLLAMA_MODEL:-}}" \
-  -e OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-${OLLAMA_HOST:-}}" \
+  -e OPENAI_API_KEY \
+  -e REPORT_LLM_PROVIDER \
+  -e REPORT_LLM_MODEL \
+  -e OLLAMA_BASE_URL \
   -v "${_reports_dir}:/workspace/reports" \
   -v "${CACHE_DIR}:/workspace/.repo-sentry" \
   --add-host=host.docker.internal:host-gateway \
