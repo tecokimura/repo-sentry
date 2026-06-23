@@ -200,12 +200,17 @@ function sanitizeReason(
 
 // deferred 理由を ReportFinding のデータから決定論的に生成（AI に委ねない）
 function buildDeferReason(f: ReportFinding): string {
+  // パッケージなし（設定ミス・Dockerfile 系）
+  if (!f.package) {
+    return "設定上の指摘であり、即時対応条件（KEV・critical）には該当しないため後回し可能。";
+  }
+
   const kev  = f.riskSignals.kev;
   const epss = f.riskSignals.epss;
   const sev  = f.riskSignals.severity?.toLowerCase();
-  const dep  = f.package?.dependencyType;
+  const dep  = f.package.dependencyType;
   const feat = f.context.affectedFeatures;
-  const pkg  = f.package?.name ?? f.context.title;
+  const pkg  = f.package.name;
 
   if (!kev && (epss === undefined || epss < 0.01)) {
     return `${pkg} は KEV 未登録かつ悪用可能性が低いため後回し可能。`;
@@ -230,8 +235,10 @@ function renderFindingWithPlan(
 ): string[] {
   // deferred は AI プランに依存せず決定論的に生成
   if (section === "deferred") {
+    const rawTitle = f.context.title ?? f.findingId ?? "—";
+    const title = rawTitle.length > 60 ? rawTitle.slice(0, 60) + "…" : rawTitle;
     return renderDeferralSection(
-      { findingId: f.findingId, title: f.context.title, deferReason: buildDeferReason(f) },
+      { findingId: f.findingId, title, deferReason: buildDeferReason(f) },
       f,
     );
   }
