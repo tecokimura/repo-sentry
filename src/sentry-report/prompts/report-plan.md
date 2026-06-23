@@ -30,13 +30,6 @@ Do NOT output any explanation, prose, markdown, or code blocks. Output ONLY the 
       "notes": "補足（省略可）"
     }
   ],
-  "deferredItems": [
-    {
-      "findingId": "CVE-XXXX (省略可)",
-      "title": "対象タイトル",
-      "deferReason": "なぜ後回しでよいか"
-    }
-  ],
   "notableRisks": [
     {
       "title": "横断的リスクのタイトル",
@@ -50,7 +43,7 @@ Do NOT output any explanation, prose, markdown, or code blocks. Output ONLY the 
 - overallRisk: KEV あり or critical severity あり → "critical"。それ以外は最高 severity に合わせる。
 - immediateActions: urgency="immediate" の findings を対象とする。
 - plannedActions: urgency="planned" の findings を対象とする。
-- deferredItems: urgency="deferred" の findings を対象とする。
+- deferredItems は出力しない。deferred findings は入力の deferredSummary として件数のみ提供される。
 - notableRisks: 複数 findings に共通するパターン（同一ライブラリの複数 CVE、同一 category の集中など）。なければ空配列。
 
 

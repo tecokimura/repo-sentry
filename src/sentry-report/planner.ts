@@ -47,12 +47,28 @@ async function loadSystemPrompt(): Promise<string> {
 }
 
 function buildUserPrompt(input: ReportInput): string {
-  const compact = {
+  // deferred は件数と severity 内訳のみ渡す（詳細はレンダー時に決定論的生成）
+  const actionFindings = input.findings.filter(
+    (f) => f.recommendedAction.urgency !== "deferred",
+  );
+  const deferredBySeverity: Record<string, number> = {};
+  for (const f of input.findings) {
+    if (f.recommendedAction.urgency !== "deferred") continue;
+    const sev = f.riskSignals.severity ?? "unknown";
+    deferredBySeverity[sev] = (deferredBySeverity[sev] ?? 0) + 1;
+  }
+  const deferredCount = input.findings.length - actionFindings.length;
+
+  const compact: Record<string, unknown> = {
     repository: input.repository,
     scannedAt: input.scannedAt,
     summary: input.summary,
-    findings: input.findings.map(compactFinding),
+    findings: actionFindings.map(compactFinding),
   };
+  if (deferredCount > 0) {
+    compact.deferredSummary = { count: deferredCount, severityBreakdown: deferredBySeverity };
+  }
+
   return `下記のスキャン結果データに基づき、system prompt のスキーマ通りの JSON を出力してください。説明文は不要です。\n\n${
     JSON.stringify(compact, null, 2)
   }`;

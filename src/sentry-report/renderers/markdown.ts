@@ -228,18 +228,21 @@ function renderFindingWithPlan(
   planLookup: Map<string, PlanAction | PlanDeferral>,
   section: "immediate" | "planned" | "deferred",
 ): string[] {
+  // deferred は AI プランに依存せず決定論的に生成
+  if (section === "deferred") {
+    return renderDeferralSection(
+      { findingId: f.findingId, title: f.context.title, deferReason: buildDeferReason(f) },
+      f,
+    );
+  }
+
   const planItem = f.findingId ? planLookup.get(f.findingId) : undefined;
   if (!planItem) return renderFindingFallback(f);
 
-  if (section === "deferred") {
-    const text = buildDeferReason(f);
-    return renderDeferralSection({ findingId: planItem.findingId, title: planItem.title, deferReason: text }, f);
-  } else {
-    const rawText = "reason" in planItem ? planItem.reason : planItem.deferReason;
-    const notes = "notes" in planItem ? (planItem as PlanAction).notes : undefined;
-    const text = sanitizeReason(rawText, section, f.findingId);
-    return renderActionSection({ findingId: planItem.findingId, title: planItem.title, reason: text, notes }, f);
-  }
+  const rawText = "reason" in planItem ? planItem.reason : planItem.deferReason;
+  const notes = "notes" in planItem ? (planItem as PlanAction).notes : undefined;
+  const text = sanitizeReason(rawText, section, f.findingId);
+  return renderActionSection({ findingId: planItem.findingId, title: planItem.title, reason: text, notes }, f);
 }
 
 function renderActionSection(action: PlanAction, f: ReportFinding | undefined): string[] {
