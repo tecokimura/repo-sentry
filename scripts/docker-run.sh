@@ -83,6 +83,20 @@ REPORTS_DIR="${REPORTS_DIR:-$PWD/reports}"
 export REPORTS_DIR
 mkdir -p "${REPORTS_DIR}/${REPORT_NAME}"
 
+# docker-scan.sh と同じ命名ロジックでベース名を確定する
+# （find による曖昧な検索を避け、全パスを決定論的に組み立てる）
+_short_name=$(printf '%s' "$_target_basename" | cut -d'_' -f1 | tr 'A-Z' 'a-z' | cut -c1-12)
+_name_prefix=$(printf '%s' "$_target_basename" | tr 'a-z' 'A-Z' | tr -cd 'A-Z0-9' | cut -c1-4)
+_sha_suffix=$(printf '%s' "$_target_basename" | sha256sum | cut -c61-64 | tr 'a-f' 'A-F')
+_hash="${_name_prefix}${_sha_suffix}"
+_base="${_short_name}_${_hash}${REPORT_DATE}"
+_proj="${REPORTS_DIR}/${REPORT_NAME}"
+
+_scan_file="${_proj}/scan_${_base}.json"
+_sbom_file="${_proj}/scan_${_base}.sbom.cdx.json"
+_enrich_file="${_proj}/enriched_${_base}.json"
+_report_file="${_proj}/report_${_base}.md"
+
 # ログファイル（reports/ と同階層の logs/<project>/ に保存）
 _log_date="$(date +%y%m%d-%H%M)"
 _logs_base="$(dirname "$REPORTS_DIR")/logs"
@@ -117,9 +131,8 @@ fi
 _log "[repo-sentry] scan 完了"
 _log ""
 
-_scan_file="$(find "${REPORTS_DIR}/${REPORT_NAME}" -maxdepth 1 -name "scan_*${REPORT_DATE}*.json" 2>/dev/null | grep -v '\.sbom\.' | sort | tail -1)"
-if [[ -z "$_scan_file" ]]; then
-  _log "[repo-sentry] エラー: scan 出力ファイルが見つかりません。"
+if [[ ! -f "$_scan_file" ]]; then
+  _log "[repo-sentry] エラー: scan 出力ファイルが見つかりません: ${_scan_file#${PWD}/}"
   exit 2
 fi
 
@@ -128,7 +141,13 @@ fi
 # -------------------------
 _log "[repo-sentry] enrich 開始"
 _enrich_exit=0
+_sbom_args=()
+if [[ -f "$_sbom_file" ]]; then
+  _sbom_args=(--sbom "$_sbom_file")
+  _log "[repo-sentry] SBOM     : ${_sbom_file#${PWD}/}"
+fi
 bash "${_SCRIPT_DIR}/docker-enrich.sh" "$_scan_file" \
+  ${_sbom_args[@]+"${_sbom_args[@]}"} \
   2> >(tee -a "$_log_file" >&2) || _enrich_exit=$?
 
 if [[ $_enrich_exit -ne 0 ]]; then
@@ -139,9 +158,8 @@ fi
 _log "[repo-sentry] enrich 完了"
 _log ""
 
-_enrich_file="$(find "${REPORTS_DIR}/${REPORT_NAME}" -maxdepth 1 -name "enriched_*${REPORT_DATE}*.json" 2>/dev/null | sort | tail -1)"
-if [[ -z "$_enrich_file" ]]; then
-  _log "[repo-sentry] エラー: enrich 出力ファイルが見つかりません。"
+if [[ ! -f "$_enrich_file" ]]; then
+  _log "[repo-sentry] エラー: enrich 出力ファイルが見つかりません: ${_enrich_file#${PWD}/}"
   exit 2
 fi
 
@@ -160,9 +178,8 @@ if [[ $_report_exit -ne 0 ]]; then
 fi
 _log "[repo-sentry] report 完了"
 
-_report_file="$(find "${REPORTS_DIR}/${REPORT_NAME}" -maxdepth 1 -name "report_*${REPORT_DATE}*.md" 2>/dev/null | sort | tail -1)"
-if [[ -z "$_report_file" ]]; then
-  _log "[repo-sentry] エラー: report 出力ファイルが見つかりません。"
+if [[ ! -f "$_report_file" ]]; then
+  _log "[repo-sentry] エラー: report 出力ファイルが見つかりません: ${_report_file#${PWD}/}"
   exit 2
 fi
 
