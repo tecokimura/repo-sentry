@@ -92,31 +92,36 @@ export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): stri
   lines.push(`| 即時対応が必要 | **${immediateFindings.length} 件** |`);
   lines.push("");
 
-  // 3. Immediate Actions（ReportInput urgency=immediate が権威）
+  // 3. 推奨対応順序
+  lines.push(...renderRecommendedActions(immediateFindings, plannedFindings, deferredFindings));
+
+  // 4. Immediate Actions（ReportInput urgency=immediate が権威）
   if (immediateFindings.length > 0) {
     lines.push("## 即時対応項目");
     lines.push("");
+    if (immediateFindings.length >= 2) {
+      lines.push(...renderPackageSummaryTable(immediateFindings));
+    }
     for (const f of immediateFindings) {
       lines.push(...renderFindingWithPlan(f, planLookup, "immediate"));
     }
   }
 
-  // 4. Planned Actions（ReportInput urgency=planned が権威）
+  // 5. Planned Actions（ReportInput urgency=planned が権威）
   if (plannedFindings.length > 0) {
     lines.push("## 計画対応項目");
     lines.push("");
+    if (plannedFindings.length >= 2) {
+      lines.push(...renderPackageSummaryTable(plannedFindings));
+    }
     for (const f of plannedFindings) {
       lines.push(...renderFindingWithPlan(f, planLookup, "planned"));
     }
   }
 
-  // 5. Deferred Items（ReportInput urgency=deferred が権威）
+  // 6. Deferred Items → パッケージ単位の集約テーブルに圧縮
   if (deferredFindings.length > 0) {
-    lines.push("## 後回し可能項目");
-    lines.push("");
-    for (const f of deferredFindings) {
-      lines.push(...renderFindingWithPlan(f, planLookup, "deferred"));
-    }
+    lines.push(...renderDeferredCompact(deferredFindings));
   }
 
   // 6. Fix Guide
@@ -225,6 +230,130 @@ function buildDeferReason(f: ReportFinding): string {
     return `${pkg} は severity が ${sev} であり即時対応条件に該当しないため後回し可能。`;
   }
   return `${pkg} は修正版が提供されているが critical・KEV の即時対応条件には該当しないため後回し可能。`;
+}
+
+function higherSeverity(a: string, b: string): string {
+  const order = ["critical", "high", "medium", "low", "unknown"];
+  const ia = order.indexOf(a.toLowerCase());
+  const ib = order.indexOf(b.toLowerCase());
+  const rankA = ia === -1 ? order.length : ia;
+  const rankB = ib === -1 ? order.length : ib;
+  return rankA <= rankB ? a : b;
+}
+
+type PkgEntry = { findings: ReportFinding[]; maxSev: string; maxVer: string };
+
+function buildPackageMap(findings: ReportFinding[]): Map<string, PkgEntry> {
+  const map = new Map<string, PkgEntry>();
+  for (const f of findings) {
+    const pkg = f.package?.name ?? f.context.title ?? "—";
+    const sev = f.riskSignals.severity ?? "unknown";
+    const ver = f.recommendedAction.recommendedVersion ?? "";
+    if (!map.has(pkg)) {
+      map.set(pkg, { findings: [f], maxSev: sev, maxVer: ver });
+    } else {
+      const e = map.get(pkg)!;
+      e.findings.push(f);
+      e.maxSev = higherSeverity(sev, e.maxSev);
+      if (ver && (!e.maxVer || semverGt(ver, e.maxVer))) e.maxVer = ver;
+    }
+  }
+  return map;
+}
+
+function renderRecommendedActions(
+  immediateFindings: ReportFinding[],
+  plannedFindings: ReportFinding[],
+  deferredFindings: ReportFinding[],
+): string[] {
+  const lines: string[] = [];
+  lines.push("## 推奨対応順序");
+  lines.push("");
+
+  if (immediateFindings.length > 0) {
+    lines.push(`### (1) 今週中（${immediateFindings.length}件）`);
+    lines.push("");
+    for (const f of immediateFindings) {
+      const pkg = f.package?.name
+        ? `\`${escMd(f.package.name)}\``
+        : escMd(f.context.title ?? "—");
+      const id = f.findingId ? ` — ${escMd(f.findingId)}` : "";
+      lines.push(`- ${pkg}${id}`);
+    }
+    lines.push("");
+  } else {
+    lines.push("### (1) 今週中");
+    lines.push("");
+    lines.push("即時対応が必要な項目はありません。");
+    lines.push("");
+  }
+
+  if (plannedFindings.length > 0) {
+    const pkgMap = buildPackageMap(plannedFindings);
+    lines.push(`### (2) 今月中（${plannedFindings.length}件 / ${pkgMap.size}パッケージ）`);
+    lines.push("");
+    for (const [pkg, { findings }] of pkgMap.entries()) {
+      const count = findings.length > 1 ? ` (${findings.length}件)` : "";
+      lines.push(`- \`${escMd(pkg)}\`${count}`);
+    }
+    lines.push("");
+  } else {
+    lines.push("### (2) 今月中");
+    lines.push("");
+    lines.push("計画対応が必要な項目はありません。");
+    lines.push("");
+  }
+
+  if (deferredFindings.length > 0) {
+    lines.push(`### (3) 次回定期アップデート時（${deferredFindings.length}件）`);
+    lines.push("");
+    lines.push(
+      `${deferredFindings.length} 件は後回し可能と判断しました。詳細は「後回し可能項目」セクションを参照してください。`,
+    );
+    lines.push("");
+  }
+
+  return lines;
+}
+
+function renderPackageSummaryTable(findings: ReportFinding[]): string[] {
+  const pkgMap = buildPackageMap(findings);
+  const hasGrouped = pkgMap.size > 1 || [...pkgMap.values()].some((v) => v.findings.length > 1);
+  if (!hasGrouped) return [];
+
+  const lines: string[] = [];
+  lines.push("### パッケージ別サマリー");
+  lines.push("");
+  lines.push("| パッケージ | CVE数 | 最大重大度 | 推奨バージョン |");
+  lines.push("| --- | --- | --- | --- |");
+  for (const [pkg, { findings, maxSev, maxVer }] of pkgMap.entries()) {
+    lines.push(
+      `| ${escMd(pkg)} | ${findings.length} | ${maxSev} | ${escMd(maxVer || "—")} |`,
+    );
+  }
+  lines.push("");
+  return lines;
+}
+
+function renderDeferredCompact(findings: ReportFinding[]): string[] {
+  const lines: string[] = [];
+  lines.push(`## 後回し可能項目（${findings.length}件）`);
+  lines.push("");
+  lines.push(
+    "現時点では即時対応条件に該当しないため次回定期アップデート時に対応してください。詳細は付録を参照してください。",
+  );
+  lines.push("");
+
+  const pkgMap = buildPackageMap(findings);
+  lines.push("| パッケージ | 件数 | 最大重大度 | 推奨バージョン |");
+  lines.push("| --- | --- | --- | --- |");
+  for (const [pkg, { findings: pf, maxSev, maxVer }] of pkgMap.entries()) {
+    lines.push(
+      `| ${escMd(pkg)} | ${pf.length} | ${maxSev} | ${escMd(maxVer || "—")} |`,
+    );
+  }
+  lines.push("");
+  return lines;
 }
 
 // finding を planLookup の AI テキストで補完してレンダー（セクション整合性チェック付き）
