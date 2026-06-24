@@ -117,7 +117,7 @@ fi
 _log "[repo-sentry] scan 完了"
 _log ""
 
-_scan_file="$(find "${REPORTS_DIR}/${REPORT_NAME}" -maxdepth 1 -name "scan_*${REPORT_DATE}*.json" 2>/dev/null | sort | tail -1)"
+_scan_file="$(find "${REPORTS_DIR}/${REPORT_NAME}" -maxdepth 1 -name "scan_*${REPORT_DATE}*.json" 2>/dev/null | grep -v '\.sbom\.' | sort | tail -1)"
 if [[ -z "$_scan_file" ]]; then
   _log "[repo-sentry] エラー: scan 出力ファイルが見つかりません。"
   exit 2
