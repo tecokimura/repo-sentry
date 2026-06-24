@@ -124,3 +124,70 @@ hr {
 strong {
   font-weight: 700;
 }
+
+/* ─── セクション見出し色分け ─── */
+
+h2[data-section="immediate"] {
+  color: #c0392b;
+  border-left-color: #c0392b;
+  background: #fff5f5;
+  padding: 8px 10px 8px 14px;
+}
+
+h2[data-section="planned"] {
+  color: #c25b00;
+  border-left-color: #e67e22;
+}
+
+h2[data-section="deferred"] {
+  color: #555;
+  border-left-color: #95a5a6;
+}
+
+/* ─── 推奨対応順序 カード ─── */
+
+h3[data-urgency="immediate"] {
+  color: #c0392b;
+  background: #fff0f0;
+  border-left: 4px solid #e74c3c;
+  padding: 6px 12px;
+  border-radius: 0 4px 4px 0;
+}
+
+h3[data-urgency="planned"] {
+  color: #c25b00;
+  background: #fff8f0;
+  border-left: 4px solid #e67e22;
+  padding: 6px 12px;
+  border-radius: 0 4px 4px 0;
+}
+
+h3[data-urgency="deferred"] {
+  color: #2e7d32;
+  background: #f1f8f1;
+  border-left: 4px solid #4caf50;
+  padding: 6px 12px;
+  border-radius: 0 4px 4px 0;
+}
+
+h3[data-urgency] + ul {
+  margin-left: 12px;
+  margin-top: 4px;
+}
+
+/* ─── 推奨修正版 強調 ─── */
+
+table td strong {
+  color: #c0392b;
+}
+
+/* ─── 修正ガイド テーブル ─── */
+
+h2[data-section="fix-guide"] ~ table thead tr {
+  background: #2c4a9c;
+}
+
+h2[data-section="fix-guide"] ~ table code {
+  font-size: 8pt;
+  background: #eef2ff;
+}

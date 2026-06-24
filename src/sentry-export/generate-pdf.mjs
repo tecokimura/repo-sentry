@@ -40,6 +40,33 @@ ${htmlBody}
 </body>
 </html>`;
 
+/** h2/h3 に data 属性を付与してセクション別 CSS を有効化 */
+async function injectSectionAttributes(page) {
+  await page.evaluate(() => {
+    // h2 に data-section を付与
+    for (const h2 of document.querySelectorAll('h2')) {
+      const t = h2.textContent || '';
+      if (t.includes('即時対応項目'))   h2.dataset.section = 'immediate';
+      else if (t.includes('計画対応項目'))  h2.dataset.section = 'planned';
+      else if (t.includes('後回し可能項目')) h2.dataset.section = 'deferred';
+      else if (t.includes('推奨対応順序'))  h2.dataset.section = 'priority';
+      else if (t.includes('修正ガイド'))    h2.dataset.section = 'fix-guide';
+    }
+    // 推奨対応順序セクション内の h3 に data-urgency を付与
+    let inPriority = false;
+    for (const el of document.querySelectorAll('h2, h3')) {
+      if (el.tagName === 'H2') {
+        inPriority = el.dataset.section === 'priority';
+      } else if (inPriority) {
+        const t = el.textContent || '';
+        if (t.includes('今週中'))      el.dataset.urgency = 'immediate';
+        else if (t.includes('今月中')) el.dataset.urgency = 'planned';
+        else if (t.includes('次回定期')) el.dataset.urgency = 'deferred';
+      }
+    }
+  });
+}
+
 const browser = await puppeteer.launch({
   executablePath: chromiumPath,
   args: [
@@ -54,6 +81,7 @@ const browser = await puppeteer.launch({
 try {
   const page = await browser.newPage();
   await page.setContent(html, { waitUntil: 'networkidle0' });
+  await injectSectionAttributes(page);
   await page.pdf({
     path: outputFile,
     format: 'A4',
