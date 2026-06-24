@@ -130,8 +130,8 @@ export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): stri
   if (fixable.length > 0) {
     lines.push("## 修正ガイド");
     lines.push("");
-    lines.push("| パッケージ | 現在バージョン | 推奨バージョン | 修正コマンド |");
-    lines.push("| --- | --- | --- | --- |");
+    lines.push("| パッケージ | 現在バージョン | 推奨バージョン |");
+    lines.push("| --- | --- | --- |");
     const fixMap = new Map<string, { pkg: string; cur: string; rec: string; cmd: string }>();
     for (const f of fixable) {
       const key = `${f.package?.name ?? ""}@${f.package?.version ?? ""}`;
@@ -145,12 +145,20 @@ export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): stri
         fixMap.set(key, { pkg, cur, rec, cmd: rawCmd });
       }
     }
-    for (const { pkg, cur, rec, cmd } of fixMap.values()) {
-      const recDisplay = rec || "—";
-      const cmdDisplay = cmd ? `\`${escMd(cmd)}\`` : "—";
-      lines.push(`| ${escMd(pkg)} | ${escMd(cur)} | ${escMd(recDisplay)} | ${cmdDisplay} |`);
+    for (const { pkg, cur, rec } of fixMap.values()) {
+      const recDisplay = rec ? `**${escMd(rec)}**` : "—";
+      lines.push(`| ${escMd(pkg)} | ${escMd(cur)} | ${recDisplay} |`);
     }
     lines.push("");
+    const cmds = [...fixMap.values()].map(({ cmd }) => cmd).filter(Boolean);
+    if (cmds.length > 0) {
+      lines.push("**更新コマンド:**");
+      lines.push("");
+      lines.push("```bash");
+      for (const cmd of cmds) lines.push(cmd);
+      lines.push("```");
+      lines.push("");
+    }
   }
 
   // 7. Appendix
@@ -270,6 +278,31 @@ function renderRecommendedActions(
   lines.push("## 推奨対応順序");
   lines.push("");
 
+  // --- サマリー表（マネージャー向け一覧）---
+  const immPkgMap  = buildPackageMap(immediateFindings);
+  const planPkgMap = buildPackageMap(plannedFindings);
+  const deferPkgMap = buildPackageMap(deferredFindings);
+
+  const immTarget = immediateFindings.length === 0
+    ? "—"
+    : immPkgMap.size === 1
+    ? `\`${escMd([...immPkgMap.keys()][0])}\``
+    : `${immPkgMap.size}パッケージ`;
+
+  let immAction = "—";
+  if (immediateFindings.length > 0) {
+    const ver = [...immPkgMap.values()][0]?.maxVer;
+    immAction = immPkgMap.size === 1 && ver ? `${escMd(ver)}へ更新` : "各パッケージを更新";
+  }
+
+  lines.push("| 対応期限 | 対象 | 件数 | 推奨アクション |");
+  lines.push("| --- | --- | ---: | --- |");
+  lines.push(`| 今週中 | ${immTarget} | ${immediateFindings.length} | ${immAction} |`);
+  lines.push(`| 今月中 | ${plannedFindings.length > 0 ? `${planPkgMap.size}パッケージ` : "—"} | ${plannedFindings.length} | ${plannedFindings.length > 0 ? "計画アップデート" : "—"} |`);
+  lines.push(`| 次回定期 | ${deferredFindings.length > 0 ? `${deferPkgMap.size}パッケージ` : "—"} | ${deferredFindings.length} | ${deferredFindings.length > 0 ? "定期更新で対応" : "—"} |`);
+  lines.push("");
+
+  // --- 期限別リスト ---
   if (immediateFindings.length > 0) {
     lines.push(`### (1) 今週中（${immediateFindings.length}件）`);
     lines.push("");
@@ -289,10 +322,9 @@ function renderRecommendedActions(
   }
 
   if (plannedFindings.length > 0) {
-    const pkgMap = buildPackageMap(plannedFindings);
-    lines.push(`### (2) 今月中（${plannedFindings.length}件 / ${pkgMap.size}パッケージ）`);
+    lines.push(`### (2) 今月中（${plannedFindings.length}件 / ${planPkgMap.size}パッケージ）`);
     lines.push("");
-    for (const [pkg, { findings }] of pkgMap.entries()) {
+    for (const [pkg, { findings }] of planPkgMap.entries()) {
       const count = findings.length > 1 ? ` (${findings.length}件)` : "";
       lines.push(`- \`${escMd(pkg)}\`${count}`);
     }

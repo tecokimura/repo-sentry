@@ -52,16 +52,28 @@ async function injectSectionAttributes(page) {
       else if (t.includes('推奨対応順序'))  h2.dataset.section = 'priority';
       else if (t.includes('修正ガイド'))    h2.dataset.section = 'fix-guide';
     }
-    // 推奨対応順序セクション内の h3 に data-urgency を付与
-    let inPriority = false;
+    // 付録セクションも検出
+    for (const h2 of document.querySelectorAll('h2')) {
+      const t = h2.textContent || '';
+      if (t.includes('付録')) h2.dataset.section = 'appendix';
+    }
+    // 推奨対応順序内の h3 + 各セクション内の finding h3 にも属性を付与
+    let currentSection = '';
     for (const el of document.querySelectorAll('h2, h3')) {
       if (el.tagName === 'H2') {
-        inPriority = el.dataset.section === 'priority';
-      } else if (inPriority) {
+        currentSection = el.dataset.section || '';
+      } else {
         const t = el.textContent || '';
-        if (t.includes('今週中'))      el.dataset.urgency = 'immediate';
-        else if (t.includes('今月中')) el.dataset.urgency = 'planned';
-        else if (t.includes('次回定期')) el.dataset.urgency = 'deferred';
+        // 推奨対応順序カード
+        if (currentSection === 'priority') {
+          if (t.includes('今週中'))        el.dataset.urgency = 'immediate';
+          else if (t.includes('今月中'))   el.dataset.urgency = 'planned';
+          else if (t.includes('次回定期')) el.dataset.urgency = 'deferred';
+        }
+        // 各セクション内の finding 見出し
+        if (!el.dataset.urgency && currentSection) {
+          el.dataset.sectionH3 = currentSection;
+        }
       }
     }
   });

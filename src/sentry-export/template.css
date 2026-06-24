@@ -130,8 +130,24 @@ strong {
 h2[data-section="immediate"] {
   color: #c0392b;
   border-left-color: #c0392b;
-  background: #fff5f5;
+  background: #fff0ee;
   padding: 8px 10px 8px 14px;
+  border-top: 1px solid #f5c6c3;
+  border-bottom: 1px solid #f5c6c3;
+}
+
+/* 即時対応 finding 見出し（h3）も赤系で強調 */
+h3[data-section-h3="immediate"] {
+  color: #c0392b;
+  background: #fff5f4;
+  border-left: 3px solid #e74c3c;
+  padding: 4px 10px;
+}
+
+/* 計画対応 finding 見出し */
+h3[data-section-h3="planned"] {
+  border-left: 3px solid #e67e22;
+  padding: 4px 10px;
 }
 
 h2[data-section="planned"] {
@@ -190,4 +206,21 @@ h2[data-section="fix-guide"] ~ table thead tr {
 h2[data-section="fix-guide"] ~ table code {
   font-size: 8pt;
   background: #eef2ff;
+}
+
+/* ─── 付録: フォント縮小 ─── */
+
+h2[data-section="appendix"] {
+  color: #444;
+  border-left-color: #aaa;
+}
+
+h2[data-section="appendix"] ~ table {
+  font-size: 8pt;
+}
+
+h2[data-section="appendix"] ~ p,
+h2[data-section="appendix"] ~ ul,
+h2[data-section="appendix"] ~ ol {
+  font-size: 8.5pt;
 }
