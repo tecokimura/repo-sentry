@@ -17,9 +17,8 @@
 - Phase 3（sentry-report）: **Stable**（実案件検証済み・`--plan-input` 検証済み）
 
 **次の優先課題**:
-1. P3-4: GitHub Actions 統合
-2. P3-5: sentry-export（PDF 生成）
-3. scripts: docker-run.sh 一括実行
+1. P3-5: sentry-export（PDF 生成）
+2. P3-6: GitHub Actions 統合（出力先・実行環境決定後）
 
 ---
 
@@ -472,9 +471,9 @@ OpenAI（デフォルト）または Ollama を選択可能（Phase 1・2 と同
 | 7 | P3-1: executiveSummary ガード強化（immediate=0 時の「即時対応」表現除去） | **完了** |
 | 8 | P3-2: sentry-enrich: PoC-in-GitHub 検知（OSV aliases / NVD reference から GitHub PoC 有無を確認） | **完了** |
 | 9 | P3-3: 実案件 3〜5 件での品質確認 | **完了** |
-| 10 | P3-4: GitHub Actions 統合 | 未着手 |
+| 10 | P3-4: docker-run.sh 一括実行（scan→enrich→report・SBOM自動パススルー） | **完了** |
 | 11 | P3-5: sentry-export: PDF 生成 | 未着手 |
-| 12 | scripts: stdout/stderr 分離 + docker-run.sh 一括実行 | 未着手 |
+| 12 | P3-6: GitHub Actions 統合（出力先・実行環境決定後） | 未着手 |
 | 13 | sentry-enrich: ExploitDB 連携 | 未着手 |
 
 ---
