@@ -83,9 +83,10 @@ REPORTS_DIR="${REPORTS_DIR:-$PWD/reports}"
 export REPORTS_DIR
 mkdir -p "${REPORTS_DIR}/${REPORT_NAME}"
 
-# ログファイル
+# ログファイル（reports/ と同階層の logs/<project>/ に保存）
 _log_date="$(date +%y%m%d-%H%M)"
-_log_dir="${REPORTS_DIR}/${REPORT_NAME}/logs"
+_logs_base="$(dirname "$REPORTS_DIR")/logs"
+_log_dir="${_logs_base}/${REPORT_NAME}"
 mkdir -p "$_log_dir"
 _log_file="${_log_dir}/run_${_log_date}.log"
 
