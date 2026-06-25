@@ -1,6 +1,6 @@
 # repo-sentry ロードマップ
 
-最終更新: 2026-06-22
+最終更新: 2026-06-25
 
 ## このドキュメントの使い方
 
@@ -11,14 +11,17 @@
 3. **[docs/report-format.md](report-format.md)** — Phase 1（sentry-scan）出力フォーマット（Phase 3 ではない）
 4. **[docs/tool-recommendations.md](tool-recommendations.md)** — 実装前設計メモ（参考用・フェーズ番号が異なるので注意）
 
-**現在の状態（2026-06-24）**:
+**現在の状態（2026-06-25）**:
 - Phase 1（sentry-scan）: **完了**
 - Phase 2（sentry-enrich）: **完了**（OSV / KEV / EPSS / 参考 URL 検証）
 - Phase 3（sentry-report）: **Stable**（実案件検証済み・`--plan-input` 検証済み）
+- P3-5（sentry-export PDF）: **実装完了・動作確認待ち**
 
 **次の優先課題**:
-1. P3-5: sentry-export（PDF 生成）
-2. P3-6: GitHub Actions 統合（出力先・実行環境決定後）
+1. P3-5 最新変更の動作確認（PDF サマリー表・修正ガイド改善・色分け強化）
+2. 問題なければ develop → main マージ + v0.3 タグ / リリースノート更新
+3. P3-6: GitHub Actions 初期版（workflow_dispatch + Artifacts 出力に絞る）
+4. P3-6 次段階: PR コメント・Slack 通知・定期実行（初期版安定後）
 
 ---
 
@@ -472,8 +475,10 @@ OpenAI（デフォルト）または Ollama を選択可能（Phase 1・2 と同
 | 8 | P3-2: sentry-enrich: PoC-in-GitHub 検知（OSV aliases / NVD reference から GitHub PoC 有無を確認） | **完了** |
 | 9 | P3-3: 実案件 3〜5 件での品質確認 | **完了** |
 | 10 | P3-4: docker-run.sh 一括実行（scan→enrich→report・SBOM自動パススルー） | **完了** |
-| 11 | P3-5: sentry-export: PDF 生成 | 未着手 |
-| 12 | P3-6: GitHub Actions 統合（出力先・実行環境決定後） | 未着手 |
+| 11 | P3-5: sentry-export: PDF 生成 | **実装完了・動作確認待ち** |
+| 12 | v0.3 リリース（develop → main マージ・タグ） | P3-5 確認後 |
+| 13 | P3-6: GitHub Actions 初期版（workflow_dispatch + Artifacts） | 設計確定済み |
+| 14 | P3-6 次段階: PR コメント / Slack 通知 / 定期実行 | 未着手 |
 | 13 | sentry-enrich: ExploitDB 連携 | 未着手 |
 
 ---
@@ -521,6 +526,36 @@ bash scripts/docker-report.sh "$ENRICHED_JSON"
 | CI への影響 | stdout 変更が既存の利用側（GitHub Actions 等）に影響しないか | 要確認 |
 
 **タイミング**: Phase 3 Stable 宣言後に未確定項目を整理してから実装に着手する。
+
+---
+
+### P3-6: GitHub Actions 設計方針（確定済み）
+
+**初期版スコープ（合意済み）**:
+
+```
+workflow_dispatch（手動実行）
+↓
+対象リポジトリを入力
+↓
+scan → enrich → report → export
+↓
+成果物を Artifacts に保存
+```
+
+**初期版に含めないもの（次段階）**:
+
+- PR コメントへの概要貼り付け（別途「短いサマリー」設計が必要なため）
+- Slack / Teams 通知
+- 定期実行（schedule trigger）
+
+**未確定項目**:
+
+| 項目 | 内容 |
+| --- | --- |
+| Runner | GitHub-hosted（Docker 制限あり）か self-hosted か |
+| 対象リポジトリの渡し方 | URL 入力 / checkout 済みパスを使う |
+| OpenAI API キーの扱い | GitHub Secrets 経由 |
 
 ---
 
