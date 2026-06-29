@@ -101,4 +101,9 @@ case $_exit in
 esac
 printf "[sentry-export] 所要時間: %d分%02d秒\n" "$(( _elapsed / 60 ))" "$(( _elapsed % 60 ))" >&2
 
+if [[ $_exit -eq 0 ]]; then
+  # stdout: 生成した PDF の相対パスのみ（docker-run.sh と同じ規則）
+  echo "${OUTPUT_FILE#${PWD}/}"
+fi
+
 exit $_exit

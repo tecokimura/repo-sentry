@@ -127,19 +127,25 @@ jobs:
 
       # -------------------------------------------------------
       # (6) PDF を生成（sentry-export）
+      #     stdout に PDF の相対パスが出力される
       # -------------------------------------------------------
       - name: PDF を生成
+        id: export
         run: |
-          bash scripts/docker-export.sh "${{ steps.run.outputs.report_md }}"
+          PDF_PATH=$(bash scripts/docker-export.sh "${{ steps.run.outputs.report_md }}")
+          echo "pdf_path=$PDF_PATH" >> "$GITHUB_OUTPUT"
 
       # -------------------------------------------------------
       # (7) 成果物を Artifacts に保存
       #     if: always() → scan/report 失敗時も中途成果物を保存
+      #     logs/ は reports/ の1つ上に出力されるため別途追加
       # -------------------------------------------------------
       - name: 成果物をアップロード
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: security-report-${{ github.run_id }}
-          path: reports/
+          path: |
+            reports/
+            logs/
           retention-days: 30
