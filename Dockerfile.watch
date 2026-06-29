@@ -1,0 +1,5 @@
+FROM denoland/deno:alpine-2.3.3
+WORKDIR /app
+COPY src/sentry-watch/ ./
+RUN deno cache cli.ts
+ENTRYPOINT ["deno", "run", "--allow-read", "--allow-write", "cli.ts"]
