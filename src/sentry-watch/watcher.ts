@@ -1,0 +1,145 @@
+import type { ChangeType, Urgency, WatchChange, WatchDiff, WatchSnapshot } from "./types.ts";
+import type { EnrichedFinding, EnrichedReport } from "../sentry-enrich/types.ts";
+
+/**
+ * Severity から urgency を導出する。
+ * urgency フィールドは enriched.json には存在しないため、KEV/EPSS/severity から再計算する。
+ *
+ * Rules:
+ *   kev=true または severity=critical  → immediate
+ *   severity=high、または medium && epss>=0.4  → planned
+ *   それ以外                           → deferred
+ */
+function deriveUrgency(finding: EnrichedFinding): Urgency {
+  const hasKev = !!finding.kev;
+  if (hasKev || finding.severity === "critical") return "immediate";
+  const epss = finding.epss?.epss;
+  if (finding.severity === "high") return "planned";
+  if (finding.severity === "medium" && epss !== undefined && epss >= 0.4) return "planned";
+  return "deferred";
+}
+
+function toSnapshot(finding: EnrichedFinding): WatchSnapshot {
+  return {
+    urgency: deriveUrgency(finding),
+    kev: !!finding.kev,
+    epss: finding.epss?.epss,
+    osvModifiedAt: finding.osv?.modifiedAt,
+  };
+}
+
+const URGENCY_RANK: Record<Urgency, number> = {
+  deferred: 0,
+  planned: 1,
+  immediate: 2,
+};
+
+function isUrgencyUpgraded(before: Urgency, after: Urgency): boolean {
+  return URGENCY_RANK[after] > URGENCY_RANK[before];
+}
+
+function isEpssRisen(before?: number, after?: number): boolean {
+  if (after === undefined) return false;
+  if (before === undefined) return false;
+  const delta = after - before;
+  if (delta >= 0.05) return true;
+  // EPSS が 0.4 をまたいだ（before < 0.4 <= after）
+  if (before < 0.4 && after >= 0.4) return true;
+  return false;
+}
+
+function isOsvUpdated(before?: string, after?: string): boolean {
+  if (!after) return false;
+  if (!before) return false;
+  return after > before;
+}
+
+export interface WatchRequest {
+  baselineEnrichedFile: string;
+  newEnrichedFile: string;
+  baselineScanFile?: string;
+}
+
+export async function runWatch(request: WatchRequest): Promise<WatchDiff> {
+  const [baselineRaw, newRaw] = await Promise.all([
+    Deno.readTextFile(request.baselineEnrichedFile),
+    Deno.readTextFile(request.newEnrichedFile),
+  ]);
+
+  const baseline: EnrichedReport = JSON.parse(baselineRaw);
+  const newReport: EnrichedReport = JSON.parse(newRaw);
+
+  // findingId でマップ化（id が同一でも location が異なる場合は複合キーにする）
+  const baselineMap = new Map<string, EnrichedFinding>();
+  for (const f of baseline.findings) {
+    const key = buildKey(f);
+    baselineMap.set(key, f);
+  }
+
+  const changes: WatchChange[] = [];
+
+  for (const newFinding of newReport.findings) {
+    const key = buildKey(newFinding);
+    const baseFinding = baselineMap.get(key);
+    if (!baseFinding) continue; // 新規登場は watch 対象外（enrich のみ比較）
+
+    const before = toSnapshot(baseFinding);
+    const after = toSnapshot(newFinding);
+
+    const changeTypes: ChangeType[] = [];
+
+    if (!before.kev && after.kev) changeTypes.push("kev_added");
+    if (isUrgencyUpgraded(before.urgency, after.urgency)) changeTypes.push("urgency_upgraded");
+    if (isEpssRisen(before.epss, after.epss)) changeTypes.push("epss_risen");
+    if (isOsvUpdated(before.osvModifiedAt, after.osvModifiedAt)) changeTypes.push("osv_updated");
+
+    if (changeTypes.length === 0) continue;
+
+    const change: WatchChange = {
+      findingId: key,
+      changeTypes,
+      before,
+      after,
+    };
+
+    if (newFinding.packageName) {
+      change.package = {
+        name: newFinding.packageName,
+        version: newFinding.packageVersion ?? "",
+      };
+    }
+
+    changes.push(change);
+  }
+
+  const summary = {
+    totalFindings: newReport.findings.length,
+    changed: changes.length,
+    kevAdded: changes.filter((c) => c.changeTypes.includes("kev_added")).length,
+    urgencyUpgraded: changes.filter((c) => c.changeTypes.includes("urgency_upgraded")).length,
+    epssRisen: changes.filter((c) => c.changeTypes.includes("epss_risen")).length,
+    osvUpdated: changes.filter((c) => c.changeTypes.includes("osv_updated")).length,
+  };
+
+  return {
+    watchVersion: "1",
+    baseline: {
+      enrichedFile: request.baselineEnrichedFile,
+      scannedAt: baseline.scannedAt,
+    },
+    checkedAt: new Date().toISOString(),
+    newEnrichedFile: request.newEnrichedFile,
+    summary,
+    changes,
+  };
+}
+
+/**
+ * finding の一意キーを生成する。
+ * id + location の組み合わせで同一性を判定する。
+ */
+function buildKey(finding: EnrichedFinding): string {
+  const id = finding.id ?? "";
+  const location = finding.location ?? "";
+  return location ? `${id}@${location}` : id;
+}
