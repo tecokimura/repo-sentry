@@ -78,10 +78,17 @@ export async function runWatch(request: WatchRequest): Promise<WatchDiff> {
 
   const changes: WatchChange[] = [];
 
+  // 新規エンリッチマップ（removed_finding 検出用）
+  const newMap = new Map<string, EnrichedFinding>();
+  for (const f of newReport.findings) {
+    newMap.set(buildKey(f), f);
+  }
+
+  // 既存 finding の変化を検出
   for (const newFinding of newReport.findings) {
     const key = buildKey(newFinding);
     const baseFinding = baselineMap.get(key);
-    if (!baseFinding) continue; // 新規登場は watch 対象外（enrich のみ比較）
+    if (!baseFinding) continue; // new_finding は別途処理
 
     const before = toSnapshot(baseFinding);
     const after = toSnapshot(newFinding);
@@ -112,6 +119,38 @@ export async function runWatch(request: WatchRequest): Promise<WatchDiff> {
     changes.push(change);
   }
 
+  // new_finding: baseline になく新規エンリッチにある
+  for (const newFinding of newReport.findings) {
+    const key = buildKey(newFinding);
+    if (baselineMap.has(key)) continue;
+
+    const change: WatchChange = {
+      findingId: key,
+      changeTypes: ["new_finding"],
+      after: toSnapshot(newFinding),
+    };
+    if (newFinding.packageName) {
+      change.package = { name: newFinding.packageName, version: newFinding.packageVersion ?? "" };
+    }
+    changes.push(change);
+  }
+
+  // removed_finding: baseline にあり新規エンリッチにない
+  for (const baseFinding of baseline.findings) {
+    const key = buildKey(baseFinding);
+    if (newMap.has(key)) continue;
+
+    const change: WatchChange = {
+      findingId: key,
+      changeTypes: ["removed_finding"],
+      before: toSnapshot(baseFinding),
+    };
+    if (baseFinding.packageName) {
+      change.package = { name: baseFinding.packageName, version: baseFinding.packageVersion ?? "" };
+    }
+    changes.push(change);
+  }
+
   const summary = {
     totalFindings: newReport.findings.length,
     changed: changes.length,
@@ -119,6 +158,8 @@ export async function runWatch(request: WatchRequest): Promise<WatchDiff> {
     urgencyUpgraded: changes.filter((c) => c.changeTypes.includes("urgency_upgraded")).length,
     epssRisen: changes.filter((c) => c.changeTypes.includes("epss_risen")).length,
     osvUpdated: changes.filter((c) => c.changeTypes.includes("osv_updated")).length,
+    newFindings: changes.filter((c) => c.changeTypes.includes("new_finding")).length,
+    removedFindings: changes.filter((c) => c.changeTypes.includes("removed_finding")).length,
   };
 
   return {

@@ -1,6 +1,12 @@
 export type Urgency = "immediate" | "planned" | "deferred";
 
-export type ChangeType = "kev_added" | "urgency_upgraded" | "epss_risen" | "osv_updated";
+export type ChangeType =
+  | "kev_added"
+  | "urgency_upgraded"
+  | "epss_risen"
+  | "osv_updated"
+  | "new_finding"
+  | "removed_finding";
 
 export interface WatchSnapshot {
   urgency: Urgency;
@@ -13,8 +19,10 @@ export interface WatchChange {
   findingId: string;
   package?: { name: string; version: string };
   changeTypes: ChangeType[];
-  before: WatchSnapshot;
-  after: WatchSnapshot;
+  /** undefined for new_finding (no baseline) */
+  before?: WatchSnapshot;
+  /** undefined for removed_finding (not in new report) */
+  after?: WatchSnapshot;
 }
 
 export interface WatchDiff {
@@ -32,6 +40,8 @@ export interface WatchDiff {
     urgencyUpgraded: number;
     epssRisen: number;
     osvUpdated: number;
+    newFindings: number;
+    removedFindings: number;
   };
   changes: WatchChange[];
 }
