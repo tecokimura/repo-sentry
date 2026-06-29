@@ -571,34 +571,147 @@ scan → enrich → report → export
 
 脆弱性情報の**変化**を検出し、優先度の変化を継続的に把握する。
 
-#### 最小版スコープ（確定済み）
+---
 
-**方式: A — enrich 再実行のみ（trivy 再スキャンなし）**
+## sentry-watch 設計（最小版・確定済み）
+
+### 目的
+
+一度スキャンしたリポジトリについて、外部脆弱性 DB（KEV / EPSS / OSV）の変化を定期的に検出し、
+urgency が上がった脆弱性を開発チームに提示する。
+
+### 採用方式: A — enrich 再実行のみ
+
+trivy による再スキャンは行わない。既存の scan.json を入力として sentry-enrich のみ再実行する。
+
+**理由**:
+- 対象リポジトリへのアクセスが不要で watch が独立して動作できる
+- sentry-enrich をそのまま再利用でき、新規コードを最小化できる
+- KEV 登録・EPSS 急上昇という最も重要な変化はこれで捕捉できる
+
+### 実行フロー
 
 ```
-入力: baseline scan.json + baseline enriched.json
+docker-watch.sh <baseline-scan.json> <baseline-enriched.json>
   ↓
-scan.json を使って sentry-enrich を再実行 → new enriched.json 生成
+(1) sentry-enrich を再実行: baseline scan.json → new enriched.json 生成
   ↓
-new enriched.json と baseline enriched.json を比較
+(2) sentry-watch 比較: baseline enriched.json vs new enriched.json
   ↓
-watch-diff.json + watch-report.md を出力
+(3) watch-diff.json + watch-report.md を出力
 ```
 
-**検出対象**:
-- KEV に新規登録された
-- EPSS が上昇した
-- urgency が上がった（deferred → planned / immediate）
-- 修正版が新たに公開された
-- OSV 情報が更新された
+### 入力ファイル
 
-**最小版でやらないこと**:
-- trivy 再実行・新規 CVE 検出（対象リポジトリが必要になるため次フェーズ）
-- Slack / Teams / Email 通知
-- GitHub Actions 定期実行
-- 自動修正 PR
+| ファイル | 説明 |
+| --- | --- |
+| `baseline scan.json` | 元スキャン結果（`scan_<hash>.json`） |
+| `baseline enriched.json` | 前回の enrich 結果（`enriched_<hash>.json`） |
 
-#### 将来版（次段階）
+### 出力ファイル
+
+出力先は `reports/<project>/` に統一（scan / enrich / report と同じディレクトリ）。
+
+| ファイル | 説明 |
+| --- | --- |
+| `watch-diff_<hash>_<YYMMDD>.json` | 差分データ（機械可読） |
+| `watch-report_<hash>_<YYMMDD>.md` | 差分レポート（人間向け） |
+
+### 検出対象と判定条件
+
+| 変化種別 | 判定条件 |
+| --- | --- |
+| KEV 新規登録 | `!baseline.kev && new.kev` |
+| urgency 上昇 | deferred→planned、deferred→immediate、planned→immediate（KEV/EPSS/severity から再導出） |
+| EPSS 上昇 | `new.epss - baseline.epss >= 0.05`（絶対値 5pt 以上）または urgency 閾値 0.4 をまたいだ場合 |
+| OSV 更新 | `new.osvModifiedAt > baseline.osvModifiedAt` |
+
+EPSS が 0.4 閾値をまたいだ場合は urgency 上昇としても分類する。
+
+urgency は enriched.json に存在しないため、以下のルールで再導出する:
+
+| 条件 | urgency |
+| --- | --- |
+| kev=true または severity=critical | immediate |
+| severity=high、または medium && epss≥0.4 | planned |
+| それ以外 | deferred |
+
+### watch-diff.json スキーマ
+
+```typescript
+interface WatchDiff {
+  watchVersion: "1";
+  baseline: {
+    enrichedFile: string;
+    scannedAt: string;
+  };
+  checkedAt: string;
+  newEnrichedFile: string;
+  summary: {
+    totalFindings: number;
+    changed: number;
+    kevAdded: number;
+    urgencyUpgraded: number;
+    epssRisen: number;
+    osvUpdated: number;
+  };
+  changes: WatchChange[];
+}
+
+type ChangeType = "kev_added" | "urgency_upgraded" | "epss_risen" | "osv_updated";
+
+interface WatchChange {
+  findingId: string;
+  package?: { name: string; version: string };
+  changeTypes: ChangeType[];
+  before: WatchSnapshot;
+  after:  WatchSnapshot;
+}
+
+interface WatchSnapshot {
+  urgency: "immediate" | "planned" | "deferred";
+  kev: boolean;
+  epss?: number;
+  osvModifiedAt?: string;
+}
+```
+
+### watch-report.md 構成
+
+1. ヘッダー（チェック日時・ベーススキャン日時）
+2. サマリー表（変化種別・件数）
+3. 要対応: urgency が上がった項目（最優先）
+4. 要確認: KEV に新規登録された項目
+5. EPSS が上昇した項目
+6. OSV 情報が更新された項目
+7. 変化なし: N 件
+
+### ファイル構成（実装対象）
+
+```
+src/sentry-watch/
+  cli.ts
+  watcher.ts        差分検出ロジック
+  reporters/
+    json.ts         watch-diff.json 生成
+    markdown.ts     watch-report.md 生成
+  types.ts
+Dockerfile.watch
+scripts/docker-watch.sh
+scripts/docker-build-watch.sh
+```
+
+### 初期版でやらないこと
+
+| 内容 | 理由 |
+| --- | --- |
+| trivy 再実行・新規 CVE 検出 | 対象リポジトリへのアクセスが必要。次フェーズ（B方式）で対応 |
+| 修正版の新規検出 | fixedVersions は trivy 由来。再スキャンなしでは更新されない |
+| Slack / Teams 通知 | 次段階で対応 |
+| GitHub Actions 定期実行 | 次段階で対応 |
+| 自動修正 PR | 次段階で対応 |
+
+### 将来版（次段階）
 
 ```
 baseline
