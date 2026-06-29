@@ -16,13 +16,12 @@
 - Phase 2（sentry-enrich）: **完了**（OSV / KEV / EPSS / 参考 URL 検証）
 - Phase 3（sentry-report）: **Stable**（実案件検証済み・`--plan-input` 検証済み）
 - P3-5（sentry-export PDF）: **動作確認済み**
+- sentry-watch MVP: **完了**（全 changeType 実装・fixture テスト済み）
 
 **次の優先課題**:
-1. develop → main マージ + v0.3 タグ / リリースノート更新
-2. sentry-watch 設計（スキーマ・diff ロジック）
-3. sentry-watch 最小実装（enrich 再実行 + diff 比較 + watch-report.md 出力）
-4. P3-6: GitHub Actions 初期版（workflow_dispatch + Artifacts）
-5. Slack / Teams 通知・定期実行は次段階
+1. P3-6: GitHub Actions 初期版（workflow_dispatch + Artifacts）
+2. sentry-watch: baseline 自動切り替え・通知（次段階）
+3. Slack / Teams 通知・定期実行は次段階
 
 ---
 
@@ -80,20 +79,32 @@ repo-sentry/
     sentry-report/    Phase 3 固有コード
       cli.ts
       reporters/
+    sentry-watch/     sentry-watch 固有コード
+      cli.ts
+      watcher.ts
+      types.ts
+      reporters/
+        json.ts
+        markdown.ts
   Dockerfile          sentry-scan 用
   Dockerfile.enrich   sentry-enrich 用
   Dockerfile.report   sentry-report 用
+  Dockerfile.watch    sentry-watch 用
   deno.json           ルートに1つ（Denoキャッシュ共有）
   docs/
+  fixtures/
+    watch-test/       sentry-watch テスト用合成データ
   scripts/
     docker-build.sh           両 image を一括 build
     docker-build-scan.sh      sentry-scan image build
     docker-build-enrich.sh    sentry-enrich image build
     docker-build-report.sh    sentry-report image build
+    docker-build-watch.sh     sentry-watch image build
     docker-scan.sh
     docker-scan-clearwing.sh
     docker-enrich.sh
     docker-report.sh
+    docker-watch.sh
 ```
 
 ### 出力ファイル構成
@@ -466,22 +477,23 @@ OpenAI（デフォルト）または Ollama を選択可能（Phase 1・2 と同
 
 | 優先度 | 内容 | 状態 |
 | --- | --- | --- |
-| 1 | sentry-scan: ecosystem / purl / fixedVersions | 完了 |
-| 2 | sentry-enrich: OSV / KEV / EPSS 連携 | 完了 |
-| 3 | sentry-enrich: 参考 URL 検証・canonicalReference 生成 | 完了 |
-| 4 | sentry-report: ReportInput / ReportPlan スキーマ設計 | 完了 |
-| 5 | sentry-report: Markdown 生成・Docker 実行環境 | 完了 |
+| 1 | sentry-scan: ecosystem / purl / fixedVersions | **完了** |
+| 2 | sentry-enrich: OSV / KEV / EPSS 連携 | **完了** |
+| 3 | sentry-enrich: 参考 URL 検証・canonicalReference 生成 | **完了** |
+| 4 | sentry-report: ReportInput / ReportPlan スキーマ設計 | **完了** |
+| 5 | sentry-report: Markdown 生成・Docker 実行環境 | **完了** |
 | 6 | Phase 3 Stable 宣言（実案件検証・`--plan-input` 検証） | **完了** |
-| 7 | P3-1: executiveSummary ガード強化（immediate=0 時の「即時対応」表現除去） | **完了** |
-| 8 | P3-2: sentry-enrich: PoC-in-GitHub 検知（OSV aliases / NVD reference から GitHub PoC 有無を確認） | **完了** |
+| 7 | P3-1: executiveSummary ガード強化 | **完了** |
+| 8 | P3-2: PoC-in-GitHub 検知 | **完了** |
 | 9 | P3-3: 実案件 3〜5 件での品質確認 | **完了** |
-| 10 | P3-4: docker-run.sh 一括実行（scan→enrich→report・SBOM自動パススルー） | **完了** |
-| 11 | P3-5: sentry-export: PDF 生成 | **実装完了・動作確認待ち** |
-| 12 | v0.3 リリース（develop → main マージ・タグ） | P3-5 確認後 |
-| 13 | sentry-watch 最小版（enrich 再実行 + diff 比較 + watch-report.md） | 設計確定済み |
+| 10 | P3-4: docker-run.sh 一括実行 | **完了** |
+| 11 | P3-5: sentry-export: PDF 生成 | **完了** |
+| 12 | v0.3 リリース（develop → main マージ・タグ） | **完了** |
+| 13 | sentry-watch MVP（全 changeType・fixture テスト） | **完了** |
 | 14 | P3-6: GitHub Actions 初期版（workflow_dispatch + Artifacts） | 設計確定済み |
-| 15 | P3-6 次段階 / sentry-watch 通知: PR コメント / Slack / 定期実行 | 未着手 |
-| 13 | sentry-enrich: ExploitDB 連携 | 未着手 |
+| 15 | sentry-watch: baseline 自動切り替え・Slack 通知 | 未着手 |
+| 16 | P3-6 次段階: PR コメント / Slack / 定期実行 | 未着手 |
+| 17 | sentry-enrich: ExploitDB 連携 | 未着手 |
 
 ---
 
@@ -621,10 +633,12 @@ docker-watch.sh <baseline-scan.json> <baseline-enriched.json>
 
 | 変化種別 | 判定条件 |
 | --- | --- |
-| KEV 新規登録 | `!baseline.kev && new.kev` |
-| urgency 上昇 | deferred→planned、deferred→immediate、planned→immediate（KEV/EPSS/severity から再導出） |
-| EPSS 上昇 | `new.epss - baseline.epss >= 0.05`（絶対値 5pt 以上）または urgency 閾値 0.4 をまたいだ場合 |
-| OSV 更新 | `new.osvModifiedAt > baseline.osvModifiedAt` |
+| `kev_added` | `!baseline.kev && new.kev` |
+| `urgency_upgraded` | deferred→planned、deferred→immediate、planned→immediate（KEV/EPSS/severity から再導出） |
+| `epss_risen` | `new.epss - baseline.epss >= 0.05`（絶対値 5pt 以上）または urgency 閾値 0.4 をまたいだ場合 |
+| `osv_updated` | `new.osvModifiedAt > baseline.osvModifiedAt` |
+| `new_finding` | baseline になく、新規エンリッチに存在する finding |
+| `removed_finding` | baseline に存在し、新規エンリッチにない finding |
 
 EPSS が 0.4 閾値をまたいだ場合は urgency 上昇としても分類する。
 
@@ -639,6 +653,14 @@ urgency は enriched.json に存在しないため、以下のルールで再導
 ### watch-diff.json スキーマ
 
 ```typescript
+type ChangeType =
+  | "kev_added"
+  | "urgency_upgraded"
+  | "epss_risen"
+  | "osv_updated"
+  | "new_finding"
+  | "removed_finding";
+
 interface WatchDiff {
   watchVersion: "1";
   baseline: {
@@ -654,18 +676,18 @@ interface WatchDiff {
     urgencyUpgraded: number;
     epssRisen: number;
     osvUpdated: number;
+    newFindings: number;
+    removedFindings: number;
   };
   changes: WatchChange[];
 }
-
-type ChangeType = "kev_added" | "urgency_upgraded" | "epss_risen" | "osv_updated";
 
 interface WatchChange {
   findingId: string;
   package?: { name: string; version: string };
   changeTypes: ChangeType[];
-  before: WatchSnapshot;
-  after:  WatchSnapshot;
+  before?: WatchSnapshot; // new_finding では undefined
+  after?:  WatchSnapshot; // removed_finding では undefined
 }
 
 interface WatchSnapshot {
@@ -684,7 +706,9 @@ interface WatchSnapshot {
 4. 要確認: KEV に新規登録された項目
 5. EPSS が上昇した項目
 6. OSV 情報が更新された項目
-7. 変化なし: N 件
+7. 新規検出: ベースライン以降に追加された項目
+8. 消滅: ベースラインから除外された項目
+9. 変化なし: N 件
 
 ### ファイル構成（実装対象）
 

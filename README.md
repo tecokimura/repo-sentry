@@ -609,6 +609,75 @@ Renderer（`ReportInput` から直接）が担当する内容:
 
 ---
 
+## sentry-watch: 脆弱性変化の継続監視（sentry-watch MVP）
+
+一度スキャン・エンリッチしたリポジトリについて、外部脆弱性 DB（KEV / EPSS / OSV）の変化を定期的に検出します。
+trivy による再スキャンは行わず、既存の `scan.json` を再エンリッチして差分を比較します。
+
+### 実行方法
+
+```bash
+bash scripts/docker-watch.sh \
+  reports/MYAPP-main/scan_myapp_A3F2260612.json \
+  reports/MYAPP-main/enriched_myapp_A3F2260612.json
+```
+
+出力先は `reports/MYAPP-main/watch/` サブディレクトリに固定されます。
+
+```text
+reports/
+  MYAPP-main/
+    scan_myapp_A3F2260612.json
+    enriched_myapp_A3F2260612.json
+    watch/
+      watch-enrich_myapp_A3F2260612.json       ← 当日の再エンリッチ結果（上書き）
+      watch-diff_A3F22606_260629.json          ← 差分 JSON
+      watch-report_A3F22606_260629.md          ← 差分レポート Markdown
+```
+
+### 検出できる変化
+
+| 変化種別 | 内容 |
+| --- | --- |
+| `kev_added` | 既知悪用脆弱性（CISA KEV）に新規登録された |
+| `urgency_upgraded` | urgency が上昇した（deferred→planned、planned→immediate 等） |
+| `epss_risen` | EPSS スコアが 5pt 以上上昇、または 0.4 閾値をまたいだ |
+| `osv_updated` | OSV の modifiedAt が更新された |
+| `new_finding` | ベースライン以降に新たに検出された finding |
+| `removed_finding` | ベースラインから消えた finding（修正・除外など） |
+
+### image の build
+
+```bash
+bash scripts/docker-build-watch.sh
+```
+
+### オプション
+
+| オプション | 説明 |
+| --- | --- |
+| `--output-dir DIR` | 出力先ディレクトリ（省略時は `baseline-enriched.json` の隣の `watch/`） |
+
+環境変数:
+
+| 変数 | 説明 |
+| --- | --- |
+| `REPORTS_DIR` | reports ルートディレクトリ（デフォルト: 入力ファイルの親の親） |
+| `GITHUB_TOKEN` | エンリッチ時の PoC 検索に使用（任意） |
+
+### fixture を使った動作確認
+
+```bash
+deno run --allow-read --allow-write src/sentry-watch/cli.ts \
+  fixtures/watch-test/enriched_baseline.json \
+  fixtures/watch-test/enriched_changed.json \
+  --output-dir fixtures/watch-test/
+```
+
+`fixtures/watch-test/` には全 changeType を網羅した合成テストデータが含まれています。
+
+---
+
 ## 終了コード
 
 | 終了コード | 意味                                     |
@@ -703,10 +772,18 @@ Ollama 使用時、Mac の Docker は Apple Silicon GPU（Metal）が使えな�
 - エグゼクティブサマリー事実検証（AI テキスト矛盾検出・フォールバック）
 - canonicalReference 優先の参考 URL 表示
 
+**sentry-watch（MVP）**: 完了
+
+- KEV 新規登録 / urgency 上昇 / EPSS 上昇 / OSV 更新 の検出
+- new_finding / removed_finding の検出
+- watch-diff.json + watch-report.md の生成
+- Docker 実行環境（Dockerfile.watch + docker-watch.sh）
+- 合成テスト fixture（fixtures/watch-test/）
+
 未実装または後続予定:
 
+- sentry-watch: baseline 自動切り替え・Slack / Teams 通知
 - ExploitDB 連携
-- sentry-export（PDF 生成）
 - Slack reporter
 - TruffleHog collector
 - 複数 repository の一括実行
