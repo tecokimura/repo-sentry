@@ -102,19 +102,13 @@ if [[ -f "${ENV_FILE:-.env}" ]]; then
   _env_file_args=(--env-file "${ENV_FILE:-.env}")
 fi
 
-# (1) sentry-enrich を再実行: baseline scan.json → new enriched.json 生成
+# watch/ サブディレクトリ（なければ自動作成）
+_watch_dir="${BASELINE_ENRICHED_DIR}/watch"
+mkdir -p "$_watch_dir"
+
+# (1) sentry-enrich を再実行: baseline scan.json → watch-enrich_*.json（固定名・上書き）
 echo "[sentry-watch] (1) ベーススキャンを再エンリッチ中..." >&2
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-
-# 出力ファイル名（REPORT_DATE を付加して baseline と区別）
-if [[ -z "${REPORT_DATE:-}" ]]; then
-  case "${DATE_FORMAT:-hour}" in
-    none)     REPORT_DATE="" ;;
-    date)     REPORT_DATE="$(date +%Y%m%d)" ;;
-    datetime) REPORT_DATE="$(date +%Y%m%d-%H%M)" ;;
-    *)        REPORT_DATE="$(date +%y%m%d%H)" ;;
-  esac
-fi
 
 # scan ファイルの識別子を抽出
 _scan_base="$(basename "$BASELINE_SCAN_FILE" .json)"
@@ -123,10 +117,10 @@ _scan_short="${_scan_stripped%%_*}"
 _scan_after_short="${_scan_stripped#${_scan_short}_}"
 _scan_hash="${_scan_after_short:0:8}"
 
-NEW_ENRICHED_FILE="${BASELINE_ENRICHED_DIR}/enriched_${_scan_short}_${_scan_hash}${REPORT_DATE}_watch.json"
+# watch-enrich_ は固定名（日付なし）で watch/ に配置して毎回上書き
+NEW_ENRICHED_FILE="${_watch_dir}/watch-enrich_${_scan_short}_${_scan_hash}.json"
 
-REPORT_DATE="$REPORT_DATE" \
-  bash "$_SCRIPT_DIR/docker-enrich.sh" \
+bash "$_SCRIPT_DIR/docker-enrich.sh" \
   "$BASELINE_SCAN_FILE" \
   --output "$NEW_ENRICHED_FILE" || {
   echo "[sentry-watch] エラー: 再エンリッチに失敗しました" >&2
@@ -136,25 +130,17 @@ REPORT_DATE="$REPORT_DATE" \
 echo "" >&2
 echo "[sentry-watch] (2) 差分を検出中..." >&2
 
-# 出力先ディレクトリを決定
+# 出力先ディレクトリを決定（デフォルト: watch/ サブディレクトリ）
 if [[ -n "$OUTPUT_DIR" ]]; then
   mkdir -p "$OUTPUT_DIR"
   _output_dir="$(cd "$OUTPUT_DIR" && pwd -P)"
 else
-  _output_dir="$BASELINE_ENRICHED_DIR"
+  _output_dir="$_watch_dir"
 fi
 
 # 入力ファイルが reports ルート配下にあることを確認
 if [[ "$BASELINE_ENRICHED_FILE" != "${_reports_dir}/"* ]]; then
   echo "エラー: baseline-enriched ファイルが REPORTS_DIR の外にあります。REPORTS_DIR を指定してください。" >&2
-  exit 2
-fi
-if [[ "$NEW_ENRICHED_FILE" != "${_reports_dir}/"* ]]; then
-  echo "エラー: new-enriched ファイルが REPORTS_DIR の外にあります。" >&2
-  exit 2
-fi
-if [[ "$_output_dir" != "${_reports_dir}/"* && "$_output_dir" != "${_reports_dir}" ]]; then
-  echo "エラー: 出力ディレクトリが REPORTS_DIR の外にあります。REPORTS_DIR を指定してください。" >&2
   exit 2
 fi
 
