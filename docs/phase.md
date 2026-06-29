@@ -1,6 +1,6 @@
 # repo-sentry ロードマップ
 
-最終更新: 2026-06-25
+最終更新: 2026-06-29
 
 ## このドキュメントの使い方
 
@@ -11,17 +11,18 @@
 3. **[docs/report-format.md](report-format.md)** — Phase 1（sentry-scan）出力フォーマット（Phase 3 ではない）
 4. **[docs/tool-recommendations.md](tool-recommendations.md)** — 実装前設計メモ（参考用・フェーズ番号が異なるので注意）
 
-**現在の状態（2026-06-25）**:
+**現在の状態（2026-06-29）**:
 - Phase 1（sentry-scan）: **完了**
 - Phase 2（sentry-enrich）: **完了**（OSV / KEV / EPSS / 参考 URL 検証）
 - Phase 3（sentry-report）: **Stable**（実案件検証済み・`--plan-input` 検証済み）
-- P3-5（sentry-export PDF）: **実装完了・動作確認待ち**
+- P3-5（sentry-export PDF）: **動作確認済み**
 
 **次の優先課題**:
-1. P3-5 最新変更の動作確認（PDF サマリー表・修正ガイド改善・色分け強化）
-2. 問題なければ develop → main マージ + v0.3 タグ / リリースノート更新
-3. P3-6: GitHub Actions 初期版（workflow_dispatch + Artifacts 出力に絞る）
-4. P3-6 次段階: PR コメント・Slack 通知・定期実行（初期版安定後）
+1. develop → main マージ + v0.3 タグ / リリースノート更新
+2. sentry-watch 設計（スキーマ・diff ロジック）
+3. sentry-watch 最小実装（enrich 再実行 + diff 比較 + watch-report.md 出力）
+4. P3-6: GitHub Actions 初期版（workflow_dispatch + Artifacts）
+5. Slack / Teams 通知・定期実行は次段階
 
 ---
 
@@ -477,8 +478,9 @@ OpenAI（デフォルト）または Ollama を選択可能（Phase 1・2 と同
 | 10 | P3-4: docker-run.sh 一括実行（scan→enrich→report・SBOM自動パススルー） | **完了** |
 | 11 | P3-5: sentry-export: PDF 生成 | **実装完了・動作確認待ち** |
 | 12 | v0.3 リリース（develop → main マージ・タグ） | P3-5 確認後 |
-| 13 | P3-6: GitHub Actions 初期版（workflow_dispatch + Artifacts） | 設計確定済み |
-| 14 | P3-6 次段階: PR コメント / Slack 通知 / 定期実行 | 未着手 |
+| 13 | sentry-watch 最小版（enrich 再実行 + diff 比較 + watch-report.md） | 設計確定済み |
+| 14 | P3-6: GitHub Actions 初期版（workflow_dispatch + Artifacts） | 設計確定済み |
+| 15 | P3-6 次段階 / sentry-watch 通知: PR コメント / Slack / 定期実行 | 未着手 |
 | 13 | sentry-enrich: ExploitDB 連携 | 未着手 |
 
 ---
@@ -567,19 +569,46 @@ scan → enrich → report → export
 
 ### sentry-watch
 
-SBOM を保管し、新規 CVE・EPSS・KEV の変化を継続監視する。
+脆弱性情報の**変化**を検出し、優先度の変化を継続的に把握する。
+
+#### 最小版スコープ（確定済み）
+
+**方式: A — enrich 再実行のみ（trivy 再スキャンなし）**
 
 ```
-SBOM
+入力: baseline scan.json + baseline enriched.json
   ↓
-定期監視（cron / GitHub Actions schedule）
+scan.json を使って sentry-enrich を再実行 → new enriched.json 生成
   ↓
-新規脆弱性 / KEV 追加 / EPSS 急上昇を検出
+new enriched.json と baseline enriched.json を比較
   ↓
-Slack / Teams / Email 通知
-  ↓
-sentry-enrich → sentry-report（必要に応じて再生成）
+watch-diff.json + watch-report.md を出力
 ```
 
-repo-sentry の最終目的は「一度スキャンして終わり」ではなく、
-**リポジトリのセキュリティ状態を継続的に把握・通知する仕組み**を提供することです。
+**検出対象**:
+- KEV に新規登録された
+- EPSS が上昇した
+- urgency が上がった（deferred → planned / immediate）
+- 修正版が新たに公開された
+- OSV 情報が更新された
+
+**最小版でやらないこと**:
+- trivy 再実行・新規 CVE 検出（対象リポジトリが必要になるため次フェーズ）
+- Slack / Teams / Email 通知
+- GitHub Actions 定期実行
+- 自動修正 PR
+
+#### 将来版（次段階）
+
+```
+baseline
+  ↓
+trivy 再スキャン → 新規 CVE 検出
+  ↓
+enrich 再実行 → 差分検出
+  ↓
+Slack / GitHub Actions / PR コメントで通知
+```
+
+repo-sentry の最終目的は「一度レポートを作るだけでなく、
+**リポジトリのセキュリティ状態の変化を継続的に把握・通知する仕組み**を提供することです。
