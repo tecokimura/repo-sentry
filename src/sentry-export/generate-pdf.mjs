@@ -1,6 +1,6 @@
 import puppeteer from "puppeteer-core";
 import { marked } from "marked";
-import { readFileSync } from "fs";
+import { mkdirSync, readFileSync } from "fs";
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 
@@ -79,6 +79,11 @@ async function injectSectionAttributes(page) {
   });
 }
 
+// コンテナを任意 UID（コンテナ内に存在しないユーザー）で実行しても
+// Chromium が起動できるよう、crashpad を無効化し HOME を書き込み可能な場所に向ける
+const writableHome = "/tmp/chromium-home";
+mkdirSync(`${writableHome}/.config`, { recursive: true });
+mkdirSync(`${writableHome}/.cache`, { recursive: true });
 const browser = await puppeteer.launch({
   executablePath: chromiumPath,
   args: [
@@ -86,7 +91,16 @@ const browser = await puppeteer.launch({
     "--disable-setuid-sandbox",
     "--disable-dev-shm-usage",
     "--disable-gpu",
+    "--disable-crashpad",
+    "--disable-crash-reporter",
+    "--disable-breakpad",
   ],
+  env: {
+    ...process.env,
+    HOME: writableHome,
+    XDG_CONFIG_HOME: `${writableHome}/.config`,
+    XDG_CACHE_HOME: `${writableHome}/.cache`,
+  },
   headless: true,
 });
 
