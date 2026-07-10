@@ -11,7 +11,7 @@
 
 body {
   font-family: 'Noto Sans CJK JP', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN',
-               'Yu Gothic', 'Meiryo', sans-serif;
+    'Yu Gothic', 'Meiryo', sans-serif;
   font-size: 10pt;
   line-height: 1.7;
   color: #1a1a1a;
@@ -107,7 +107,8 @@ blockquote {
   background: #fafafa;
 }
 
-ul, ol {
+ul,
+ol {
   margin: 8px 0 8px 24px;
 }
 

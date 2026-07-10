@@ -68,7 +68,9 @@ function parseArgs(args: string[]): CliRequest {
   }
 
   if (positional.length < 2) {
-    throw new Error("引数が不足しています: <baseline-enriched.json> <new-enriched.json> が必要です");
+    throw new Error(
+      "引数が不足しています: <baseline-enriched.json> <new-enriched.json> が必要です",
+    );
   }
 
   request.baselineEnrichedFile = positional[0];

@@ -1,5 +1,5 @@
 export type { Severity, SeveritySummary } from "../shared/types.ts";
-export { severityOrder, allSummary } from "../shared/types.ts";
+export { allSummary, severityOrder } from "../shared/types.ts";
 
 export type ToolName =
   | "gitleaks"

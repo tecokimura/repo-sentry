@@ -1,7 +1,9 @@
 reports/
 .repo-sentry/
 *.log
-.env
+# .env のバリアント（.env.ollama 等）も含めて除外。テンプレートの .env.example のみ追跡する
+.env*
+!.env.example
 # examples/ の実案件ファイルは機密情報を含むため除外
 examples/**/*.json
 examples/**/*.md

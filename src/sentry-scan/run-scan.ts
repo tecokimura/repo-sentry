@@ -1,7 +1,11 @@
 import { collectDependabot } from "./collectors/dependabot.ts";
 import { collectGitleaks } from "./collectors/gitleaks.ts";
 import { collectTrivy } from "./collectors/trivy.ts";
-import { DEFAULT_OLLAMA_MODEL, DEFAULT_OPENAI_MODEL, enrichWithClearwing } from "./collectors/clearwing.ts";
+import {
+  DEFAULT_OLLAMA_MODEL,
+  DEFAULT_OPENAI_MODEL,
+  enrichWithClearwing,
+} from "./collectors/clearwing.ts";
 import type {
   CollectorResult,
   CollectorStatus,
@@ -75,7 +79,10 @@ function deriveProfile(request: ScanRequest): string {
   return "base";
 }
 
-async function fetchToolVersions(tools: ToolName[], request: ScanRequest): Promise<Record<string, string>> {
+async function fetchToolVersions(
+  tools: ToolName[],
+  request: ScanRequest,
+): Promise<Record<string, string>> {
   const versions: Record<string, string> = {};
   const checks: Promise<void>[] = [];
 

@@ -1,4 +1,4 @@
-import type { ReportInput, ReportFinding } from "./types.ts";
+import type { ReportFinding, ReportInput } from "./types.ts";
 import type { ReportPlan } from "./plan.ts";
 import { REPORT_PLAN_VERSION } from "./plan.ts";
 import { safeErrorMessage } from "../shared/utils.ts";
@@ -92,9 +92,7 @@ function compactFinding(f: ReportFinding): Record<string, unknown> {
     urgency: f.recommendedAction.urgency,
     fixAvailable: f.recommendedAction.fixAvailable,
     recommendedVersion: f.recommendedAction.recommendedVersion,
-    poc: f.context.poc
-      ? { found: true, confidence: f.context.poc.confidence }
-      : undefined,
+    poc: f.context.poc ? { found: true, confidence: f.context.poc.confidence } : undefined,
     context: {
       title: f.context.title,
       attackCategory: f.context.attackCategory,
@@ -164,7 +162,9 @@ function parseReportPlan(raw: string): ReportPlan {
   try {
     parsed = JSON.parse(stripped) as ReportPlan;
   } catch (e) {
-    throw new Error(`ReportPlan の JSON パースに失敗: ${safeErrorMessage(e)}\nraw:\n${raw.slice(0, 300)}`);
+    throw new Error(
+      `ReportPlan の JSON パースに失敗: ${safeErrorMessage(e)}\nraw:\n${raw.slice(0, 300)}`,
+    );
   }
 
   return normalizeReportPlan(parsed);

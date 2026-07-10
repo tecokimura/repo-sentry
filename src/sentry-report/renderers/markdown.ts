@@ -1,6 +1,6 @@
-import type { ReportPlan, PlanAction, PlanDeferral } from "../plan.ts";
-import type { ReportInput, ReportFinding, ReportSummary } from "../types.ts";
-import { filterAvailableVersions, parseSemVer, cmpSemVer } from "../semver.ts";
+import type { PlanAction, PlanDeferral, ReportPlan } from "../plan.ts";
+import type { ReportFinding, ReportInput, ReportSummary } from "../types.ts";
+import { cmpSemVer, filterAvailableVersions, parseSemVer } from "../semver.ts";
 
 function semverGt(a: string, b: string): boolean {
   const pa = parseSemVer(a);
@@ -16,12 +16,14 @@ export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): stri
   const planLookup = buildPlanLookup(plan);
 
   // 表示グループは ReportInput.urgency を正規分類として使用
-  const immediateFindings = input.findings.filter((f) => f.recommendedAction.urgency === "immediate");
-  const plannedFindings   = input.findings.filter((f) => f.recommendedAction.urgency === "planned");
-  const deferredFindings  = input.findings.filter((f) => f.recommendedAction.urgency === "deferred");
+  const immediateFindings = input.findings.filter((f) =>
+    f.recommendedAction.urgency === "immediate"
+  );
+  const plannedFindings = input.findings.filter((f) => f.recommendedAction.urgency === "planned");
+  const deferredFindings = input.findings.filter((f) => f.recommendedAction.urgency === "deferred");
 
   // AI plan と urgency のズレを警告（後で参照するため先に収集）
-  warnUrgencyMismatch(plan, input, planLookup);
+  warnUrgencyMismatch(plan, input);
 
   // Title
   const title = input.repository
@@ -41,7 +43,8 @@ export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): stri
   // AI の executiveSummary は補足文として使用（問題のある文を除外し残りを表示）
   if (plan.executiveSummary) {
     const { cleaned, removedCount } = sanitizeImmediateExpressions(
-      plan.executiveSummary, immediateFindings.length,
+      plan.executiveSummary,
+      immediateFindings.length,
     );
     if (removedCount > 0) {
       console.error(
@@ -55,7 +58,9 @@ export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): stri
         for (const c of conflicts) {
           console.error(`[sentry-report] warning: executiveSummary が summaryFacts と矛盾: ${c}`);
         }
-        console.error("[sentry-report] warning: executiveSummary の表示をスキップしました（決定論的な冒頭文を使用）");
+        console.error(
+          "[sentry-report] warning: executiveSummary の表示をスキップしました（決定論的な冒頭文を使用）",
+        );
       } else {
         lines.push(summaryText);
         lines.push("");
@@ -185,14 +190,37 @@ export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): stri
 
 const FALLBACK_REASON = {
   immediate: "悪用状況または重大度を踏まえ、優先的に確認・対応してください。",
-  planned:   "修正版が提供されているため、通常のアップデート計画に組み込んで対応してください。",
-  deferred:  "現時点では即時対応条件には該当しないため、他の高優先度項目の対応後に確認してください。",
+  planned: "修正版が提供されているため、通常のアップデート計画に組み込んで対応してください。",
+  deferred:
+    "現時点では即時対応条件には該当しないため、他の高優先度項目の対応後に確認してください。",
 } as const;
 
 const CONTRADICTION_PATTERNS: Record<"immediate" | "planned" | "deferred", string[]> = {
-  immediate: ["後回しでよい", "後回しで良い", "後回しにしてください", "後回しで対応", "計画的に対応"],
-  planned:   ["後回しでよい", "後回しで良い", "後回しで対応", "後回しでも", "直ちに対応が必要", "即時対応が必要", "直ちに修正", "緊急の対応が必要"],
-  deferred:  ["即時対応が必要", "直ちに対応が必要", "早急に対応", "今すぐ対応", "緊急の対応が必要", "緊急対応が必要"],
+  immediate: [
+    "後回しでよい",
+    "後回しで良い",
+    "後回しにしてください",
+    "後回しで対応",
+    "計画的に対応",
+  ],
+  planned: [
+    "後回しでよい",
+    "後回しで良い",
+    "後回しで対応",
+    "後回しでも",
+    "直ちに対応が必要",
+    "即時対応が必要",
+    "直ちに修正",
+    "緊急の対応が必要",
+  ],
+  deferred: [
+    "即時対応が必要",
+    "直ちに対応が必要",
+    "早急に対応",
+    "今すぐ対応",
+    "緊急の対応が必要",
+    "緊急対応が必要",
+  ],
 };
 
 function sanitizeReason(
@@ -204,7 +232,9 @@ function sanitizeReason(
   const contradicts = CONTRADICTION_PATTERNS[section].some((p) => text.includes(p));
   if (contradicts) {
     console.error(
-      `[sentry-report] warning: ${findingId ?? "?"} の reason が ${section} セクションと矛盾するためデフォルト文に置き換えました`,
+      `[sentry-report] warning: ${
+        findingId ?? "?"
+      } の reason が ${section} セクションと矛盾するためデフォルト文に置き換えました`,
     );
     return FALLBACK_REASON[section];
   }
@@ -218,12 +248,12 @@ function buildDeferReason(f: ReportFinding): string {
     return "設定上の指摘であり、即時対応条件（KEV・critical）には該当しないため後回し可能。";
   }
 
-  const kev  = f.riskSignals.kev;
+  const kev = f.riskSignals.kev;
   const epss = f.riskSignals.epss;
-  const sev  = f.riskSignals.severity?.toLowerCase();
-  const dep  = f.package.dependencyType;
+  const sev = f.riskSignals.severity?.toLowerCase();
+  const dep = f.package.dependencyType;
   const feat = f.context.affectedFeatures;
-  const pkg  = f.package.name;
+  const pkg = f.package.name;
 
   if (!kev && (epss === undefined || epss < 0.01)) {
     return `${pkg} は KEV 未登録かつ悪用可能性が低いため後回し可能。`;
@@ -279,7 +309,7 @@ function renderRecommendedActions(
   lines.push("");
 
   // --- サマリー表（マネージャー向け一覧）---
-  const immPkgMap  = buildPackageMap(immediateFindings);
+  const immPkgMap = buildPackageMap(immediateFindings);
   const planPkgMap = buildPackageMap(plannedFindings);
   const deferPkgMap = buildPackageMap(deferredFindings);
 
@@ -298,8 +328,16 @@ function renderRecommendedActions(
   lines.push("| 対応期限 | 対象 | 件数 | 推奨アクション |");
   lines.push("| --- | --- | ---: | --- |");
   lines.push(`| 今週中 | ${immTarget} | ${immediateFindings.length} | ${immAction} |`);
-  lines.push(`| 今月中 | ${plannedFindings.length > 0 ? `${planPkgMap.size}パッケージ` : "—"} | ${plannedFindings.length} | ${plannedFindings.length > 0 ? "計画アップデート" : "—"} |`);
-  lines.push(`| 次回定期 | ${deferredFindings.length > 0 ? `${deferPkgMap.size}パッケージ` : "—"} | ${deferredFindings.length} | ${deferredFindings.length > 0 ? "定期更新で対応" : "—"} |`);
+  lines.push(
+    `| 今月中 | ${
+      plannedFindings.length > 0 ? `${planPkgMap.size}パッケージ` : "—"
+    } | ${plannedFindings.length} | ${plannedFindings.length > 0 ? "計画アップデート" : "—"} |`,
+  );
+  lines.push(
+    `| 次回定期 | ${
+      deferredFindings.length > 0 ? `${deferPkgMap.size}パッケージ` : "—"
+    } | ${deferredFindings.length} | ${deferredFindings.length > 0 ? "定期更新で対応" : "—"} |`,
+  );
   lines.push("");
 
   // --- 期限別リスト ---
@@ -307,9 +345,7 @@ function renderRecommendedActions(
     lines.push(`### (1) 今週中（${immediateFindings.length}件）`);
     lines.push("");
     for (const f of immediateFindings) {
-      const pkg = f.package?.name
-        ? `\`${escMd(f.package.name)}\``
-        : escMd(f.context.title ?? "—");
+      const pkg = f.package?.name ? `\`${escMd(f.package.name)}\`` : escMd(f.context.title ?? "—");
       const id = f.findingId ? ` — ${escMd(f.findingId)}` : "";
       lines.push(`- ${pkg}${id}`);
     }
@@ -410,7 +446,12 @@ function renderFindingWithPlan(
   const rawText = "reason" in planItem ? planItem.reason : planItem.deferReason;
   const notes = "notes" in planItem ? (planItem as PlanAction).notes : undefined;
   const text = sanitizeReason(rawText, section, f.findingId);
-  return renderActionSection({ findingId: planItem.findingId, title: planItem.title, reason: text, notes }, f);
+  return renderActionSection({
+    findingId: planItem.findingId,
+    title: planItem.title,
+    reason: text,
+    notes,
+  }, f);
 }
 
 function renderActionSection(action: PlanAction, f: ReportFinding | undefined): string[] {
@@ -473,18 +514,28 @@ function renderFindingTable(f: ReportFinding): string[] {
     }
   }
   if (f.riskSignals.epss != null) {
-    rows.push(["EPSS", `${(f.riskSignals.epss * 100).toFixed(1)}% (${
-      f.riskSignals.epssPercentile != null
-        ? `${(f.riskSignals.epssPercentile * 100).toFixed(1)}パーセンタイル`
-        : ""
-    })`]);
+    rows.push([
+      "EPSS",
+      `${(f.riskSignals.epss * 100).toFixed(1)}% (${
+        f.riskSignals.epssPercentile != null
+          ? `${(f.riskSignals.epssPercentile * 100).toFixed(1)}パーセンタイル`
+          : ""
+      })`,
+    ]);
   }
   if (f.riskSignals.kev) {
-    rows.push(["KEV", `悪用確認済み${f.context.kevDateAdded ? ` (${f.context.kevDateAdded})` : ""}`]);
+    rows.push([
+      "KEV",
+      `悪用確認済み${f.context.kevDateAdded ? ` (${f.context.kevDateAdded})` : ""}`,
+    ]);
   }
   if (f.context.poc) {
     const { confidence, sources } = f.context.poc;
-    const badge = confidence === "high" ? "⚠ 高信頼度" : confidence === "medium" ? "中信頼度" : "低信頼度";
+    const badge = confidence === "high"
+      ? "⚠ 高信頼度"
+      : confidence === "medium"
+      ? "中信頼度"
+      : "低信頼度";
     rows.push(["PoC", `公開済み [${badge}] (${sources.length} 件)`]);
     for (const s of sources) {
       rows.push(["", s.url]);
@@ -519,7 +570,6 @@ function buildPlanLookup(plan: ReportPlan): Map<string, PlanAction | PlanDeferra
 function warnUrgencyMismatch(
   plan: ReportPlan,
   input: ReportInput,
-  planLookup: Map<string, PlanAction | PlanDeferral>,
 ): void {
   const urgencyMap = new Map<string, "immediate" | "planned" | "deferred">();
   for (const f of input.findings) {
@@ -532,14 +582,16 @@ function warnUrgencyMismatch(
       const actual = urgencyMap.get(id);
       if (actual && actual !== section) {
         console.error(
-          `[sentry-report] warning: ${id} は AI plan で ${section} 分類ですが urgency=${actual} のため ${actual === "immediate" ? "即時対応" : actual === "planned" ? "計画対応" : "後回し"} に表示します`,
+          `[sentry-report] warning: ${id} は AI plan で ${section} 分類ですが urgency=${actual} のため ${
+            actual === "immediate" ? "即時対応" : actual === "planned" ? "計画対応" : "後回し"
+          } に表示します`,
         );
       }
     }
   };
   check("immediate", plan.immediateActions.map((a) => a.findingId));
-  check("planned",   plan.plannedActions.map((a) => a.findingId));
-  check("deferred",  plan.deferredItems.map((d) => d.findingId));
+  check("planned", plan.plannedActions.map((a) => a.findingId));
+  check("deferred", plan.deferredItems.map((d) => d.findingId));
 }
 
 function buildSummaryOpening(summary: ReportSummary, immediateCount: number): string {
@@ -555,10 +607,14 @@ function buildSummaryOpening(summary: ReportSummary, immediateCount: number): st
     return `今回のスキャンでは High の脆弱性が ${high} 件、うち ${kevCount} 件が KEV（実悪用確認済み）に登録されています。即時対応が必要な項目が ${immediateCount} 件あります。`;
   }
   if (high > 0) {
-    return `今回のスキャンでは High の脆弱性が ${high} 件検出されました。Critical / KEV には該当しないため即時対応対象は ${immediateCount} 件ですが、計画的な対応を推奨します。${epssHighCount > 0 ? ` なお EPSS ≥ 70% の脆弱性が ${epssHighCount} 件含まれます。` : ""}`;
+    return `今回のスキャンでは High の脆弱性が ${high} 件検出されました。Critical / KEV には該当しないため即時対応対象は ${immediateCount} 件ですが、計画的な対応を推奨します。${
+      epssHighCount > 0 ? ` なお EPSS ≥ 70% の脆弱性が ${epssHighCount} 件含まれます。` : ""
+    }`;
   }
   if (medium > 0 || low > 0) {
-    return `今回のスキャンでは Critical / High の脆弱性は検出されませんでした。Medium が ${medium} 件${low > 0 ? `、Low が ${low} 件` : ""}確認されており、通常の更新サイクルでの対応を推奨します。`;
+    return `今回のスキャンでは Critical / High の脆弱性は検出されませんでした。Medium が ${medium} 件${
+      low > 0 ? `、Low が ${low} 件` : ""
+    }確認されており、通常の更新サイクルでの対応を推奨します。`;
   }
   return "今回のスキャンでは脆弱性は検出されませんでした。";
 }
@@ -573,8 +629,15 @@ function sanitizeImmediateExpressions(
   if (immediateCount > 0) return { cleaned: text, removedCount: 0 };
 
   const patterns = [
-    "即時対応", "緊急対応", "直ちに対応", "早急に対応",
-    "優先的に対応", "至急対応", "直ちに修正", "早急な対応", "緊急な対応",
+    "即時対応",
+    "緊急対応",
+    "直ちに対応",
+    "早急に対応",
+    "優先的に対応",
+    "至急対応",
+    "直ちに修正",
+    "早急な対応",
+    "緊急な対応",
   ];
 
   const parts = text.split("。");
@@ -596,7 +659,11 @@ function sanitizeImmediateExpressions(
   return { cleaned: kept.join("。"), removedCount };
 }
 
-function detectSummaryConflicts(text: string, summary: ReportSummary, plannedCount: number): SummaryConflict[] {
+function detectSummaryConflicts(
+  text: string,
+  summary: ReportSummary,
+  plannedCount: number,
+): SummaryConflict[] {
   const conflicts: SummaryConflict[] = [];
   const highOrAbove = summary.high + summary.critical;
 
@@ -611,7 +678,9 @@ function detectSummaryConflicts(text: string, summary: ReportSummary, plannedCou
       "高リスクの脆弱性は検出されません",
     ];
     if (negations.some((p) => text.includes(p))) {
-      conflicts.push(`high=${summary.high}/critical=${summary.critical} なのに高リスク否定表現あり`);
+      conflicts.push(
+        `high=${summary.high}/critical=${summary.critical} なのに高リスク否定表現あり`,
+      );
     }
   }
 
@@ -628,7 +697,12 @@ function detectSummaryConflicts(text: string, summary: ReportSummary, plannedCou
   }
 
   if (summary.critical === 0) {
-    const criticalAffirm = ["Critical が存在", "Critical が検出", "Criticalが存在", "クリティカルな脆弱性が存在"];
+    const criticalAffirm = [
+      "Critical が存在",
+      "Critical が検出",
+      "Criticalが存在",
+      "クリティカルな脆弱性が存在",
+    ];
     if (criticalAffirm.some((p) => text.includes(p))) {
       conflicts.push("critical=0 なのに Critical 存在の表現あり");
     }
@@ -646,10 +720,14 @@ function detectSummaryConflicts(text: string, summary: ReportSummary, plannedCou
 
 function riskLabel(risk: string): string {
   switch (risk) {
-    case "critical": return "🔴 Critical";
-    case "high":     return "🟠 High";
-    case "medium":   return "🟡 Medium";
-    default:         return "🟢 Low";
+    case "critical":
+      return "🔴 Critical";
+    case "high":
+      return "🟠 High";
+    case "medium":
+      return "🟡 Medium";
+    default:
+      return "🟢 Low";
   }
 }
 

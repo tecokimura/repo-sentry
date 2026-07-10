@@ -1,6 +1,12 @@
 import { completeCollector, failCollector, startCollector } from "./common.ts";
 import type { CollectorResult, Finding, FindingCategory, ScanRequest } from "../types.ts";
-import { ensureDir, readJsonFile, safeErrorMessage, sbomOutputPath, toSeverity } from "../../shared/utils.ts";
+import {
+  ensureDir,
+  readJsonFile,
+  safeErrorMessage,
+  sbomOutputPath,
+  toSeverity,
+} from "../../shared/utils.ts";
 
 interface TrivyReport {
   Results?: TrivyResult[];
@@ -237,15 +243,30 @@ function normalizeVulnerability(
 
 function trivyTypeToEcosystem(type: string | undefined): string {
   switch (type) {
-    case "composer": return "composer";
-    case "npm": case "yarn": case "node-pkg": return "npm";
-    case "pip": case "pipenv": case "poetry": return "pypi";
-    case "gomod": case "gobinary": return "golang";
-    case "cargo": return "cargo";
-    case "gem": return "gem";
-    case "nuget": return "nuget";
-    case "maven": case "gradle": return "maven";
-    default: return "";
+    case "composer":
+      return "composer";
+    case "npm":
+    case "yarn":
+    case "node-pkg":
+      return "npm";
+    case "pip":
+    case "pipenv":
+    case "poetry":
+      return "pypi";
+    case "gomod":
+    case "gobinary":
+      return "golang";
+    case "cargo":
+      return "cargo";
+    case "gem":
+      return "gem";
+    case "nuget":
+      return "nuget";
+    case "maven":
+    case "gradle":
+      return "maven";
+    default:
+      return "";
   }
 }
 

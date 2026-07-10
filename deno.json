@@ -1,6 +1,6 @@
 {
   "tasks": {
-    "check": "deno check src/sentry-scan/cli.ts",
+    "check": "deno check src/sentry-scan/cli.ts src/sentry-enrich/cli.ts src/sentry-report/cli.ts src/sentry-watch/cli.ts",
     "fmt": "deno fmt",
     "lint": "deno lint",
     "test": "deno test --allow-read --allow-write=./reports --allow-env=GITHUB_TOKEN --allow-net=api.github.com,host.docker.internal --allow-run=gitleaks,trivy",

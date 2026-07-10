@@ -4,8 +4,9 @@
 > フォーマットを説明しています。
 >
 > **Phase 3（sentry-report）** のレポートフォーマット（エグゼクティブサマリー・計画対応項目・
-> 修正ガイドなど）は [docs/phase.md](phase.md) の「Phase 3: sentry-report」セクションを参照してください。
-> sentry-report は `enriched_*.json` を入力として AI と Renderer が協調してレポートを生成します。
+> 修正ガイドなど）は [docs/phase.md](phase.md) の「Phase 3:
+> sentry-report」セクションを参照してください。 sentry-report は `enriched_*.json` を入力として AI
+> と Renderer が協調してレポートを生成します。
 
 ---
 

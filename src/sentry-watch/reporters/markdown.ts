@@ -10,6 +10,9 @@ export function renderWatchReportMarkdown(diff: WatchDiff): string {
   lines.push(`- **チェック日時**: ${diff.checkedAt}`);
   lines.push(`- **ベーススキャン日時**: ${diff.baseline.scannedAt}`);
   lines.push(`- **ベースラインファイル**: ${diff.baseline.enrichedFile}`);
+  if (diff.baseline.scanFile) {
+    lines.push(`- **ベーススキャンファイル**: ${diff.baseline.scanFile}`);
+  }
   lines.push(`- **新規エンリッチファイル**: ${diff.newEnrichedFile}`);
   lines.push("");
 

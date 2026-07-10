@@ -29,6 +29,8 @@ export interface WatchDiff {
   watchVersion: "1";
   baseline: {
     enrichedFile: string;
+    /** ベーススキャンの scan_*.json パス（--baseline-scan 指定時のみ） */
+    scanFile?: string;
     scannedAt: string;
   };
   checkedAt: string;

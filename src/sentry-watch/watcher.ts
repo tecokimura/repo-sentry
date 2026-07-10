@@ -1,23 +1,6 @@
 import type { ChangeType, Urgency, WatchChange, WatchDiff, WatchSnapshot } from "./types.ts";
 import type { EnrichedFinding, EnrichedReport } from "../sentry-enrich/types.ts";
-
-/**
- * Severity から urgency を導出する。
- * urgency フィールドは enriched.json には存在しないため、KEV/EPSS/severity から再計算する。
- *
- * Rules:
- *   kev=true または severity=critical  → immediate
- *   severity=high、または medium && epss>=0.4  → planned
- *   それ以外                           → deferred
- */
-function deriveUrgency(finding: EnrichedFinding): Urgency {
-  const hasKev = !!finding.kev;
-  if (hasKev || finding.severity === "critical") return "immediate";
-  const epss = finding.epss?.epss;
-  if (finding.severity === "high") return "planned";
-  if (finding.severity === "medium" && epss !== undefined && epss >= 0.4) return "planned";
-  return "deferred";
-}
+import { deriveUrgency } from "../shared/urgency.ts";
 
 function toSnapshot(finding: EnrichedFinding): WatchSnapshot {
   return {
@@ -66,9 +49,17 @@ export async function runWatch(request: WatchRequest): Promise<WatchDiff> {
     Deno.readTextFile(request.newEnrichedFile),
   ]);
 
-  const baseline: EnrichedReport = JSON.parse(baselineRaw);
-  const newReport: EnrichedReport = JSON.parse(newRaw);
+  return diffReports(JSON.parse(baselineRaw), JSON.parse(newRaw), request);
+}
 
+/**
+ * baseline と新規エンリッチ結果を比較して差分を生成する（純粋関数・テスト対象）。
+ */
+export function diffReports(
+  baseline: EnrichedReport,
+  newReport: EnrichedReport,
+  request: Pick<WatchRequest, "baselineEnrichedFile" | "newEnrichedFile" | "baselineScanFile">,
+): WatchDiff {
   // findingId でマップ化（id が同一でも location が異なる場合は複合キーにする）
   const baselineMap = new Map<string, EnrichedFinding>();
   for (const f of baseline.findings) {
@@ -166,6 +157,7 @@ export async function runWatch(request: WatchRequest): Promise<WatchDiff> {
     watchVersion: "1",
     baseline: {
       enrichedFile: request.baselineEnrichedFile,
+      ...(request.baselineScanFile ? { scanFile: request.baselineScanFile } : {}),
       scannedAt: baseline.scannedAt,
     },
     checkedAt: new Date().toISOString(),

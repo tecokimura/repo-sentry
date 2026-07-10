@@ -1,6 +1,6 @@
 # repo-sentry ロードマップ
 
-最終更新: 2026-06-29
+最終更新: 2026-07-10
 
 ## このドキュメントの使い方
 
@@ -8,18 +8,25 @@
 
 1. **このファイル（phase.md）** — 全体構成・各フェーズの実装状況・優先順位
 2. **[README.md](../README.md)** — 実行方法・オプション・環境変数
-3. **[docs/report-format.md](report-format.md)** — Phase 1（sentry-scan）出力フォーマット（Phase 3 ではない）
-4. **[docs/tool-recommendations.md](tool-recommendations.md)** — 実装前設計メモ（参考用・フェーズ番号が異なるので注意）
+3. **[docs/report-format.md](report-format.md)** — Phase 1（sentry-scan）出力フォーマット（Phase 3
+   ではない）
+4. **[docs/tool-recommendations.md](tool-recommendations.md)** —
+   実装前設計メモ（参考用・フェーズ番号が異なるので注意）
 
-**現在の状態（2026-06-29）**:
+**現在の状態（2026-07-10）**:
+
 - Phase 1（sentry-scan）: **完了**
 - Phase 2（sentry-enrich）: **完了**（OSV / KEV / EPSS / 参考 URL 検証）
 - Phase 3（sentry-report）: **Stable**（実案件検証済み・`--plan-input` 検証済み）
 - P3-5（sentry-export PDF）: **動作確認済み**
 - sentry-watch MVP: **完了**（全 changeType 実装・fixture テスト済み）
+- P3-6（GitHub Actions 初期版）: **実装済み**（workflow_dispatch + Artifacts・動作確認中）
+- 2026-07-10: レビュー指摘 11 件対応（ドキュメント追随・docker-watch 検証強化・watcher.test
+  追加ほか。詳細: [notes/2026-07-10-review-fixes.md](notes/2026-07-10-review-fixes.md)）
 
 **次の優先課題**:
-1. P3-6: GitHub Actions 初期版（workflow_dispatch + Artifacts）
+
+1. P3-6: GitHub Actions 初期版の動作確認（手順: [github-actions-test.md](github-actions-test.md)）
 2. sentry-watch: baseline 自動切り替え・通知（次段階）
 3. Slack / Teams 通知・定期実行は次段階
 
@@ -27,8 +34,8 @@
 
 ## ツールのゴール
 
-repo-sentry は、**開発チームが「どの脆弱性を・いつ・どう対応するか」を判断できる根拠**を、
-スキャン → エンリッチ → レポートのパイプラインで自動生成するツールです。
+repo-sentry は、**開発チームが「どの脆弱性を・いつ・どう対応するか」を判断できる根拠**を、 スキャン
+→ エンリッチ → レポートのパイプラインで自動生成するツールです。
 
 **解決したい課題**:
 
@@ -48,25 +55,25 @@ repo-sentry は、**開発チームが「どの脆弱性を・いつ・どう対
 
 ## 設計方針（実装側・レビュー側合意済み）
 
-| 方針 | 内容 |
-|---|---|
-| 分類は機械、文章は AI | urgency・修正バージョン・コマンドは ReportInput から決定論的に生成。AI は理由・判断の文章のみ担当 |
-| AI が間違っても壊れない | Renderer 側ガード（`sanitizeReason` / `detectSummaryConflicts`）で矛盾検出・フォールバック |
-| プロンプト 20%・ガード 80% | AI 品質はプロンプト改善より Renderer 防御を主軸とする |
-| 品質検証フェーズ | 現在は機能不足ではなく実案件で壊れないことが優先。新機能追加より品質安定が先 |
+| 方針                       | 内容                                                                                              |
+| -------------------------- | ------------------------------------------------------------------------------------------------- |
+| 分類は機械、文章は AI      | urgency・修正バージョン・コマンドは ReportInput から決定論的に生成。AI は理由・判断の文章のみ担当 |
+| AI が間違っても壊れない    | Renderer 側ガード（`sanitizeReason` / `detectSummaryConflicts`）で矛盾検出・フォールバック        |
+| プロンプト 20%・ガード 80% | AI 品質はプロンプト改善より Renderer 防御を主軸とする                                             |
+| 品質検証フェーズ           | 現在は機能不足ではなく実案件で壊れないことが優先。新機能追加より品質安定が先                      |
 
 ---
 
 ## 全体構成
 
-`repo-sentry` は3つのツールで構成されるモノレポ。
+`repo-sentry` は scan / enrich / report / export / watch のツール群で構成されるモノレポ。
 
 ### ソースコード構成
 
 ```
 repo-sentry/
   src/
-    shared/           共通ユーティリティ（utils.ts 等）
+    shared/           共通ユーティリティ（utils.ts / urgency.ts 等）
     sentry-scan/      Phase 1 固有コード
       cli.ts
       run-scan.ts
@@ -78,8 +85,9 @@ repo-sentry/
       reporters/
     sentry-report/    Phase 3 固有コード
       cli.ts
-      reporters/
-    sentry-watch/     sentry-watch 固有コード
+      renderers/
+    sentry-export/    PDF 生成（Node + Chromium）
+    sentry-watch/     継続監視（差分検出）
       cli.ts
       watcher.ts
       types.ts
@@ -89,22 +97,26 @@ repo-sentry/
   Dockerfile          sentry-scan 用
   Dockerfile.enrich   sentry-enrich 用
   Dockerfile.report   sentry-report 用
+  Dockerfile.export   sentry-export 用
   Dockerfile.watch    sentry-watch 用
   deno.json           ルートに1つ（Denoキャッシュ共有）
   docs/
   fixtures/
     watch-test/       sentry-watch テスト用合成データ
   scripts/
-    docker-build.sh           両 image を一括 build
+    docker-build.sh           全 image を一括 build
     docker-build-scan.sh      sentry-scan image build
     docker-build-enrich.sh    sentry-enrich image build
     docker-build-report.sh    sentry-report image build
+    docker-build-export.sh    sentry-export image build
     docker-build-watch.sh     sentry-watch image build
     docker-scan.sh
     docker-scan-clearwing.sh
     docker-enrich.sh
     docker-report.sh
+    docker-export.sh
     docker-watch.sh
+    docker-run.sh             scan → enrich → report 一括実行
 ```
 
 ### 出力ファイル構成
@@ -125,11 +137,11 @@ reports/
 
 **ファイル名プレフィックス**
 
-| プレフィックス | 生成ツール |
-| --- | --- |
-| `scan_` | sentry-scan |
-| `enriched_` | sentry-enrich |
-| `report_` | sentry-report |
+| プレフィックス | 生成ツール    |
+| -------------- | ------------- |
+| `scan_`        | sentry-scan   |
+| `enriched_`    | sentry-enrich |
+| `report_`      | sentry-report |
 
 ### データフロー
 
@@ -159,12 +171,12 @@ sentry-scan
 
 ### ツール名の意味
 
-| ツール | 意味 |
-| --- | --- |
-| sentry | 歩哨・番兵（リポジトリを見張る） |
-| sentry-scan | リポジトリをスキャンして脆弱性・機密情報を収集する |
-| sentry-enrich | 外部DBで脆弱性情報を補強する |
-| sentry-report | 収集・補強済みデータから報告書を生成する |
+| ツール        | 意味                                               |
+| ------------- | -------------------------------------------------- |
+| sentry        | 歩哨・番兵（リポジトリを見張る）                   |
+| sentry-scan   | リポジトリをスキャンして脆弱性・機密情報を収集する |
+| sentry-enrich | 外部DBで脆弱性情報を補強する                       |
+| sentry-report | 収集・補強済みデータから報告書を生成する           |
 
 ---
 
@@ -211,8 +223,8 @@ reports/
 
 prefix : scan_（sentry-scan固有）
 short  : プロジェクト名の最初のセグメント（小文字・12文字以内）
-HASH   : プロジェクト名の sha256 頭4文字（大文字）
-YYMMDDHH: 日時（時間単位）
+HASH   : プロジェクト名の先頭4文字（英数大文字）+ sha256 末尾4桁（最大8文字）
+YYMMDDHH: 日時（時間単位。DATE_FORMAT / REPORT_DATE で変更・省略可能）
 suffix : cw-std / cw-pri / cw-vrb（Clearwing なしは省略）
 ```
 
@@ -221,11 +233,14 @@ suffix : cw-std / cw-pri / cw-vrb（Clearwing なしは省略）
 Clearwing は既存スキャン結果に構造化タグを付与する正規化エンジン。
 
 出力項目:
-- **Category**: RCE / XSS / SSRF / SQLi / DoS / Validation Bypass / Open Redirect / Auth Bypass / Info Disclosure / Command Injection / Header Injection / Path Traversal / Deserialization / Other
+
+- **Category**: RCE / XSS / SSRF / SQLi / DoS / Validation Bypass / Open Redirect / Auth Bypass /
+  Info Disclosure / Command Injection / Header Injection / Path Traversal / Deserialization / Other
 - **Impact**: 技術的影響のリスト
 - **Affected Features**: 影響を受ける可能性のある機能・コンポーネント
 
-**Conditions は Phase 1 では出力しない。** コード検索が必要なため Phase 2（sentry-enrich）の責務とする。
+**Conditions は Phase 1 では出力しない。** コード検索が必要なため Phase
+2（sentry-enrich）の責務とする。
 
 LLM: OpenAI（デフォルト）または Ollama を選択可能。
 
@@ -245,20 +260,20 @@ LLM: OpenAI（デフォルト）または Ollama を選択可能。
 
 ### 実装済み
 
-| ソース | 取得内容 | 備考 |
-| --- | --- | --- |
-| OSV | 脆弱性詳細・aliases・summary | `GET /v1/vulns/{id}` |
-| CISA KEV | 実際に悪用されているか（既知悪用脆弱性判定） | `dateAdded` / `requiredAction` 等 |
-| EPSS | 今後悪用される可能性スコア（0.0〜1.0） | FIRST API、CVE のみ対象 |
-| SBOM | direct / transitive 判定 | `--sbom` オプションで指定 |
-| 参考 URL 検証 | canonicalReference 生成・不正 URL 分離 | CVE→AVD URL、GHSA→GitHub Advisory URL |
+| ソース        | 取得内容                                     | 備考                                  |
+| ------------- | -------------------------------------------- | ------------------------------------- |
+| OSV           | 脆弱性詳細・aliases・summary                 | `GET /v1/vulns/{id}`                  |
+| CISA KEV      | 実際に悪用されているか（既知悪用脆弱性判定） | `dateAdded` / `requiredAction` 等     |
+| EPSS          | 今後悪用される可能性スコア（0.0〜1.0）       | FIRST API、CVE のみ対象               |
+| SBOM          | direct / transitive 判定                     | `--sbom` オプションで指定             |
+| 参考 URL 検証 | canonicalReference 生成・不正 URL 分離       | CVE→AVD URL、GHSA→GitHub Advisory URL |
 
 ### 残タスク
 
-| 内容 | 優先度 |
-| --- | --- |
-| ExploitDB 連携 | 中 |
-| Conditions（悪用に必要な条件のコード検索） | 低 |
+| 内容                                       | 優先度 |
+| ------------------------------------------ | ------ |
+| ExploitDB 連携                             | 中     |
+| Conditions（悪用に必要な条件のコード検索） | 低     |
 
 ### 入出力
 
@@ -351,7 +366,7 @@ interface ReportInput {
   profile: string;
   repository?: string;
   scannedAt: string;
-  summary: ReportSummary;   // total / critical / high / medium / low / immediate / kevCount / epssHighCount
+  summary: ReportSummary; // total / critical / high / medium / low / immediate / kevCount / epssHighCount
   findings: ReportFinding[]; // priorityScore 降順ソート済み
 }
 
@@ -368,11 +383,11 @@ interface ReportFinding {
   };
   riskSignals: {
     severity: string;
-    epss?: number;           // 0.0–1.0
+    epss?: number; // 0.0–1.0
     epssPercentile?: number;
     kev: boolean;
     hasFixedVersion: boolean;
-    priorityScore: number;   // 0–100 自動計算
+    priorityScore: number; // 0–100 自動計算
   };
   recommendedAction: {
     action: "upgrade" | "mitigate" | "monitor" | "accept";
@@ -380,8 +395,8 @@ interface ReportFinding {
     fixAvailable: boolean;
     fixedVersions?: string[];
     recommendedVersion?: string; // 同メジャー・現バージョン超の最小バージョン
-    fixCommand?: string;         // エコシステム別修正コマンド（composer/npm/pip 等）
-    command?: string;            // 後方互換（非推奨）
+    fixCommand?: string; // エコシステム別修正コマンド（composer/npm/pip 等）
+    command?: string; // 後方互換（非推奨）
   };
   context: {
     title: string;
@@ -393,9 +408,9 @@ interface ReportFinding {
     osvAliases?: string[];
     kevDateAdded?: string;
     kevRequiredAction?: string;
-    attackCategory?: string;      // Clearwing 由来
-    impact?: string[];            // Clearwing 由来
-    affectedFeatures?: string[];  // Clearwing 由来
+    attackCategory?: string; // Clearwing 由来
+    impact?: string[]; // Clearwing 由来
+    affectedFeatures?: string[]; // Clearwing 由来
     analysisSource?: "clearwing";
   };
 }
@@ -403,27 +418,27 @@ interface ReportFinding {
 
 ### priorityScore 計算式
 
-| 要素 | 加算 |
-| --- | --- |
-| critical | +40 |
-| high | +25 |
-| medium | +15 |
-| low | +5 |
-| kev=true | +40（実悪用確認済み） |
-| epss ≥ 0.9 | +20 |
-| epss ≥ 0.7 | +10 |
-| epss ≥ 0.4 | +5 |
-| direct 依存 | +5 |
-| 上限 | 100 |
+| 要素        | 加算                  |
+| ----------- | --------------------- |
+| critical    | +40                   |
+| high        | +25                   |
+| medium      | +15                   |
+| low         | +5                    |
+| kev=true    | +40（実悪用確認済み） |
+| epss ≥ 0.9  | +20                   |
+| epss ≥ 0.7  | +10                   |
+| epss ≥ 0.4  | +5                    |
+| direct 依存 | +5                    |
+| 上限        | 100                   |
 
 ### urgency 導出ルール
 
-| 条件 | urgency |
-| --- | --- |
-| kev=true | `immediate` |
-| severity=critical | `immediate` |
-| severity=high, または medium && epss≥0.4 | `planned` |
-| それ以外 | `deferred` |
+| 条件                                     | urgency     |
+| ---------------------------------------- | ----------- |
+| kev=true                                 | `immediate` |
+| severity=critical                        | `immediate` |
+| severity=high, または medium && epss≥0.4 | `planned`   |
+| それ以外                                 | `deferred`  |
 
 ### ReportPlan v1
 
@@ -441,8 +456,8 @@ interface ReportPlan {
 interface PlanAction {
   findingId?: string;
   title: string;
-  reason: string;   // なぜ対応すべきか（AI が記述）
-  notes?: string;   // アップグレード時の注意など（任意）
+  reason: string; // なぜ対応すべきか（AI が記述）
+  notes?: string; // アップグレード時の注意など（任意）
 }
 
 interface PlanDeferral {
@@ -475,25 +490,26 @@ OpenAI（デフォルト）または Ollama を選択可能（Phase 1・2 と同
 
 ## 開発優先順位
 
-| 優先度 | 内容 | 状態 |
-| --- | --- | --- |
-| 1 | sentry-scan: ecosystem / purl / fixedVersions | **完了** |
-| 2 | sentry-enrich: OSV / KEV / EPSS 連携 | **完了** |
-| 3 | sentry-enrich: 参考 URL 検証・canonicalReference 生成 | **完了** |
-| 4 | sentry-report: ReportInput / ReportPlan スキーマ設計 | **完了** |
-| 5 | sentry-report: Markdown 生成・Docker 実行環境 | **完了** |
-| 6 | Phase 3 Stable 宣言（実案件検証・`--plan-input` 検証） | **完了** |
-| 7 | P3-1: executiveSummary ガード強化 | **完了** |
-| 8 | P3-2: PoC-in-GitHub 検知 | **完了** |
-| 9 | P3-3: 実案件 3〜5 件での品質確認 | **完了** |
-| 10 | P3-4: docker-run.sh 一括実行 | **完了** |
-| 11 | P3-5: sentry-export: PDF 生成 | **完了** |
-| 12 | v0.3 リリース（develop → main マージ・タグ） | **完了** |
-| 13 | sentry-watch MVP（全 changeType・fixture テスト） | **完了** |
-| 14 | P3-6: GitHub Actions 初期版（workflow_dispatch + Artifacts） | 設計確定済み |
-| 15 | sentry-watch: baseline 自動切り替え・Slack 通知 | 未着手 |
-| 16 | P3-6 次段階: PR コメント / Slack / 定期実行 | 未着手 |
-| 17 | sentry-enrich: ExploitDB 連携 | 未着手 |
+| 優先度 | 内容                                                         | 状態                       |
+| ------ | ------------------------------------------------------------ | -------------------------- |
+| 1      | sentry-scan: ecosystem / purl / fixedVersions                | **完了**                   |
+| 2      | sentry-enrich: OSV / KEV / EPSS 連携                         | **完了**                   |
+| 3      | sentry-enrich: 参考 URL 検証・canonicalReference 生成        | **完了**                   |
+| 4      | sentry-report: ReportInput / ReportPlan スキーマ設計         | **完了**                   |
+| 5      | sentry-report: Markdown 生成・Docker 実行環境                | **完了**                   |
+| 6      | Phase 3 Stable 宣言（実案件検証・`--plan-input` 検証）       | **完了**                   |
+| 7      | P3-1: executiveSummary ガード強化                            | **完了**                   |
+| 8      | P3-2: PoC-in-GitHub 検知                                     | **完了**                   |
+| 9      | P3-3: 実案件 3〜5 件での品質確認                             | **完了**                   |
+| 10     | P3-4: docker-run.sh 一括実行                                 | **完了**                   |
+| 11     | P3-5: sentry-export: PDF 生成                                | **完了（動作確認済み）**   |
+| 12     | v0.3 リリース（develop → main マージ・タグ）                 | **完了**                   |
+| 13     | sentry-watch MVP（全 changeType・fixture テスト）            | **完了**                   |
+| 14     | sentry-watch: watcher.test.ts（fixtures/watch-test/ を使用） | **完了**                   |
+| 15     | P3-6: GitHub Actions 初期版（workflow_dispatch + Artifacts） | **実装済み（動作確認中）** |
+| 16     | sentry-watch: baseline 自動切り替え・Slack 通知              | 未着手                     |
+| 17     | P3-6 次段階: PR コメント / Slack / 定期実行                  | 未着手                     |
+| 18     | sentry-enrich: ExploitDB 連携                                | 未着手                     |
 
 ---
 
@@ -505,11 +521,14 @@ OpenAI（デフォルト）または Ollama を選択可能（Phase 1・2 と同
 
 #### 確定した方針
 
-- **stdout = 生成ファイルパス（1行のみ）**: スクリプトが生成したファイルのパスのみを stdout に出力する
+- **stdout = 生成ファイルパス（1行のみ）**: スクリプトが生成したファイルのパスのみを stdout
+  に出力する
   - ファイル内容（JSON）を stdout に出すと中間ファイルが残らず、デバッグ・再実行が難しくなるため
-  - ファイルパスであれば `jq '.findings[]' "$(docker-scan.sh repo)"` や `cat "$path" | awk ...` と同等の加工が可能
+  - ファイルパスであれば `jq '.findings[]' "$(docker-scan.sh repo)"` や `cat "$path" | awk ...`
+    と同等の加工が可能
 - **stderr = 進捗・エラーメッセージ**: ターミナルに表示する人間向けのメッセージはすべて stderr へ
-- **ログファイル = 詳細ログ**: stderr と同じ内容を `logs/` 配下のファイルにも書き出す（`tail -f` での追跡を想定）
+- **ログファイル = 詳細ログ**: stderr と同じ内容を `logs/` 配下のファイルにも書き出す（`tail -f`
+  での追跡を想定）
 
 **パイプライン接続イメージ（確定）**:
 
@@ -530,14 +549,14 @@ bash scripts/docker-report.sh "$ENRICHED_JSON"
 
 #### 未確定・要検討の項目
 
-| 項目 | 内容 | 状態 |
-| --- | --- | --- |
-| ログファイルの置き場 | `logs/` を `reports/{project}/` 配下にするか、プロジェクトルート直下にするか | 未決 |
-| ログローテーション | いつ・どのタイミングで古いログを消すか（手動 / 件数 / 日付） | 未検討 |
-| ログレベル | 全メッセージを出すか、エラーのみにするか、`--verbose` で切り替えるか | 未決 |
-| エラー時の挙動 | `docker-run.sh` で途中のステップが失敗した場合、後続をスキップして何を stdout に出すか | 未決 |
-| `--plan-input` の扱い | 個別オプションを使う場合は個別スクリプト実行を推奨する方針でよいか | 要確認 |
-| CI への影響 | stdout 変更が既存の利用側（GitHub Actions 等）に影響しないか | 要確認 |
+| 項目                  | 内容                                                                                   | 状態   |
+| --------------------- | -------------------------------------------------------------------------------------- | ------ |
+| ログファイルの置き場  | `logs/` を `reports/{project}/` 配下にするか、プロジェクトルート直下にするか           | 未決   |
+| ログローテーション    | いつ・どのタイミングで古いログを消すか（手動 / 件数 / 日付）                           | 未検討 |
+| ログレベル            | 全メッセージを出すか、エラーのみにするか、`--verbose` で切り替えるか                   | 未決   |
+| エラー時の挙動        | `docker-run.sh` で途中のステップが失敗した場合、後続をスキップして何を stdout に出すか | 未決   |
+| `--plan-input` の扱い | 個別オプションを使う場合は個別スクリプト実行を推奨する方針でよいか                     | 要確認 |
+| CI への影響           | stdout 変更が既存の利用側（GitHub Actions 等）に影響しないか                           | 要確認 |
 
 **タイミング**: Phase 3 Stable 宣言後に未確定項目を整理してから実装に着手する。
 
@@ -565,11 +584,11 @@ scan → enrich → report → export
 
 **未確定項目**:
 
-| 項目 | 内容 |
-| --- | --- |
-| Runner | GitHub-hosted（Docker 制限あり）か self-hosted か |
-| 対象リポジトリの渡し方 | URL 入力 / checkout 済みパスを使う |
-| OpenAI API キーの扱い | GitHub Secrets 経由 |
+| 項目                   | 内容                                              |
+| ---------------------- | ------------------------------------------------- |
+| Runner                 | GitHub-hosted（Docker 制限あり）か self-hosted か |
+| 対象リポジトリの渡し方 | URL 入力 / checkout 済みパスを使う                |
+| OpenAI API キーの扱い  | GitHub Secrets 経由                               |
 
 ---
 
@@ -585,7 +604,7 @@ scan → enrich → report → export
 
 ---
 
-## sentry-watch 設計（最小版・確定済み）
+## sentry-watch 設計（最小版・実装済み）
 
 ### 目的
 
@@ -597,6 +616,7 @@ urgency が上がった脆弱性を開発チームに提示する。
 trivy による再スキャンは行わない。既存の scan.json を入力として sentry-enrich のみ再実行する。
 
 **理由**:
+
 - 対象リポジトリへのアクセスが不要で watch が独立して動作できる
 - sentry-enrich をそのまま再利用でき、新規コードを最小化できる
 - KEV 登録・EPSS 急上昇という最も重要な変化はこれで捕捉できる
@@ -615,40 +635,41 @@ docker-watch.sh <baseline-scan.json> <baseline-enriched.json>
 
 ### 入力ファイル
 
-| ファイル | 説明 |
-| --- | --- |
-| `baseline scan.json` | 元スキャン結果（`scan_<hash>.json`） |
+| ファイル                 | 説明                                         |
+| ------------------------ | -------------------------------------------- |
+| `baseline scan.json`     | 元スキャン結果（`scan_<hash>.json`）         |
 | `baseline enriched.json` | 前回の enrich 結果（`enriched_<hash>.json`） |
 
 ### 出力ファイル
 
-出力先は `reports/<project>/` に統一（scan / enrich / report と同じディレクトリ）。
+出力先は `reports/<project>/watch/` サブディレクトリ（watch の成果物をまとめて管理）。
 
-| ファイル | 説明 |
-| --- | --- |
-| `watch-diff_<hash>_<YYMMDD>.json` | 差分データ（機械可読） |
-| `watch-report_<hash>_<YYMMDD>.md` | 差分レポート（人間向け） |
+| ファイル                           | 説明                                   |
+| ---------------------------------- | -------------------------------------- |
+| `watch-enrich_<short>_<hash>.json` | 再エンリッチ結果（固定名・毎回上書き） |
+| `watch-diff_<hash>_<YYMMDD>.json`  | 差分データ（機械可読）                 |
+| `watch-report_<hash>_<YYMMDD>.md`  | 差分レポート（人間向け）               |
 
 ### 検出対象と判定条件
 
-| 変化種別 | 判定条件 |
-| --- | --- |
-| `kev_added` | `!baseline.kev && new.kev` |
-| `urgency_upgraded` | deferred→planned、deferred→immediate、planned→immediate（KEV/EPSS/severity から再導出） |
-| `epss_risen` | `new.epss - baseline.epss >= 0.05`（絶対値 5pt 以上）または urgency 閾値 0.4 をまたいだ場合 |
-| `osv_updated` | `new.osvModifiedAt > baseline.osvModifiedAt` |
-| `new_finding` | baseline になく、新規エンリッチに存在する finding |
-| `removed_finding` | baseline に存在し、新規エンリッチにない finding |
+| 変化種別           | 判定条件                                                                                    |
+| ------------------ | ------------------------------------------------------------------------------------------- |
+| `kev_added`        | `!baseline.kev && new.kev`                                                                  |
+| `urgency_upgraded` | deferred→planned、deferred→immediate、planned→immediate（KEV/EPSS/severity から再導出）     |
+| `epss_risen`       | `new.epss - baseline.epss >= 0.05`（絶対値 5pt 以上）または urgency 閾値 0.4 をまたいだ場合 |
+| `osv_updated`      | `new.osvModifiedAt > baseline.osvModifiedAt`                                                |
+| `new_finding`      | baseline になく、新規エンリッチに存在する finding                                           |
+| `removed_finding`  | baseline に存在し、新規エンリッチにない finding                                             |
 
 EPSS が 0.4 閾値をまたいだ場合は urgency 上昇としても分類する。
 
 urgency は enriched.json に存在しないため、以下のルールで再導出する:
 
-| 条件 | urgency |
-| --- | --- |
-| kev=true または severity=critical | immediate |
-| severity=high、または medium && epss≥0.4 | planned |
-| それ以外 | deferred |
+| 条件                                     | urgency   |
+| ---------------------------------------- | --------- |
+| kev=true または severity=critical        | immediate |
+| severity=high、または medium && epss≥0.4 | planned   |
+| それ以外                                 | deferred  |
 
 ### watch-diff.json スキーマ
 
@@ -665,6 +686,7 @@ interface WatchDiff {
   watchVersion: "1";
   baseline: {
     enrichedFile: string;
+    scanFile?: string; // --baseline-scan 指定時のみ
     scannedAt: string;
   };
   checkedAt: string;
@@ -686,8 +708,8 @@ interface WatchChange {
   findingId: string;
   package?: { name: string; version: string };
   changeTypes: ChangeType[];
-  before?: WatchSnapshot; // new_finding では undefined
-  after?:  WatchSnapshot; // removed_finding では undefined
+  before?: WatchSnapshot; // new_finding の場合は undefined
+  after?: WatchSnapshot; // removed_finding の場合は undefined
 }
 
 interface WatchSnapshot {
@@ -708,7 +730,7 @@ interface WatchSnapshot {
 6. OSV 情報が更新された項目
 7. 新規検出: ベースライン以降に追加された項目
 8. 消滅: ベースラインから除外された項目
-9. 変化なし: N 件
+9. 変化なし（変化が 1 件もない場合のみ表示）
 
 ### ファイル構成（実装対象）
 
@@ -727,13 +749,13 @@ scripts/docker-build-watch.sh
 
 ### 初期版でやらないこと
 
-| 内容 | 理由 |
-| --- | --- |
+| 内容                        | 理由                                                        |
+| --------------------------- | ----------------------------------------------------------- |
 | trivy 再実行・新規 CVE 検出 | 対象リポジトリへのアクセスが必要。次フェーズ（B方式）で対応 |
-| 修正版の新規検出 | fixedVersions は trivy 由来。再スキャンなしでは更新されない |
-| Slack / Teams 通知 | 次段階で対応 |
-| GitHub Actions 定期実行 | 次段階で対応 |
-| 自動修正 PR | 次段階で対応 |
+| 修正版の新規検出            | fixedVersions は trivy 由来。再スキャンなしでは更新されない |
+| Slack / Teams 通知          | 次段階で対応                                                |
+| GitHub Actions 定期実行     | 次段階で対応                                                |
+| 自動修正 PR                 | 次段階で対応                                                |
 
 ### 将来版（次段階）
 

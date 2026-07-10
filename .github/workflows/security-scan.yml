@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       target_repo:
-        description: 'スキャン対象リポジトリ (owner/repo 形式)'
+        description: "スキャン対象リポジトリ (owner/repo 形式)"
         required: true
         type: string
 

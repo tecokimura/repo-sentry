@@ -79,7 +79,11 @@ function buildPocInfo(refs: OsvReference[]): PocInfo | undefined {
       sources.push({ url: ref.url, source: "osv-reference", reason: "OSV reference type EXPLOIT" });
     } else if (POC_GITHUB_REPO_RE.test(ref.url)) {
       seen.add(ref.url);
-      sources.push({ url: ref.url, source: "osv-reference", reason: "OSV reference GitHub PoC URL pattern" });
+      sources.push({
+        url: ref.url,
+        source: "osv-reference",
+        reason: "OSV reference GitHub PoC URL pattern",
+      });
     }
   }
 

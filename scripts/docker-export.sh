@@ -75,6 +75,11 @@ fi
 mkdir -p "$(dirname "$OUTPUT_FILE")"
 OUTPUT_FILE="$(cd "$(dirname "$OUTPUT_FILE")" && pwd -P)/$(basename "$OUTPUT_FILE")"
 
+if [[ "$OUTPUT_FILE" != "${_reports_dir}/"* ]]; then
+  echo "エラー: --output が REPORTS_DIR の外にあります。REPORTS_DIR 配下を指定してください。" >&2
+  exit 2
+fi
+
 # コンテナ内パスへ変換
 _container_input="/workspace/reports/${INPUT_FILE#${_reports_dir}/}"
 _container_output="/workspace/reports/${OUTPUT_FILE#${_reports_dir}/}"

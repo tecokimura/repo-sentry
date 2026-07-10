@@ -15,28 +15,16 @@ Arguments:
   BASELINE_ENRICHED_JSON    ベーラインの enriched_*.json ファイルパス (必須)
 
 Options:
-  --output-dir DIR          出力先ディレクトリ (default: BASELINE_ENRICHED_JSON と同じディレクトリ)
+  --output-dir DIR          出力先ディレクトリ (default: BASELINE_ENRICHED_JSON と同じ階層の watch/ サブディレクトリ)
   -h, --help                このヘルプを表示
 
 環境変数:
-  DATE_FORMAT               ファイル名のタイムスタンプ形式 (default: hour)
-                            none: なし / date: YYYYMMDD / datetime: YYYYMMDD-HHMM / hour: YYMMDDHH
-  REPORT_DATE               タイムスタンプ文字列を直接指定（DATE_FORMAT より優先）
   REPORTS_DIR               reports ルートディレクトリ (default: 入力ファイルの親の親)
   CACHE_DIR                 Deno キャッシュディレクトリ (default: .repo-sentry/)
   DOCKER_USER               Docker 実行ユーザー (default: 現在の UID:GID)
   GITHUB_TOKEN              GitHub Personal Access Token（エンリッチ時の PoC 検索に使用）
 EOF
 }
-
-# DATE_FORMAT / REPORT_DATE はホスト側で使うため .env を直接読む
-_env_file="${ENV_FILE:-.env}"
-if [[ -z "${DATE_FORMAT:-}" && -f "$_env_file" ]]; then
-  DATE_FORMAT="$(grep -E '^DATE_FORMAT=' "$_env_file" | tail -1 | cut -d= -f2-)"
-fi
-if [[ -z "${REPORT_DATE:-}" && -f "$_env_file" ]]; then
-  REPORT_DATE="$(grep -E '^REPORT_DATE=' "$_env_file" | tail -1 | cut -d= -f2-)"
-fi
 
 IMAGE="${REPO_SENTRY_WATCH_IMAGE:-repo-sentry-watch:local}"
 DOCKER_USER="${DOCKER_USER:-$(id -u):$(id -g)}"
@@ -106,6 +94,28 @@ fi
 _watch_dir="${BASELINE_ENRICHED_DIR}/watch"
 mkdir -p "$_watch_dir"
 
+# 出力先ディレクトリを決定（デフォルト: watch/ サブディレクトリ）
+if [[ -n "$OUTPUT_DIR" ]]; then
+  mkdir -p "$OUTPUT_DIR"
+  _output_dir="$(cd "$OUTPUT_DIR" && pwd -P)"
+else
+  _output_dir="$_watch_dir"
+fi
+
+# 入力・出力が reports ルート配下にあることを確認（enrich 実行前に検証する）
+if [[ "$BASELINE_ENRICHED_FILE" != "${_reports_dir}/"* ]]; then
+  echo "エラー: baseline-enriched ファイルが REPORTS_DIR の外にあります。REPORTS_DIR を指定してください。" >&2
+  exit 2
+fi
+if [[ "$BASELINE_SCAN_FILE" != "${_reports_dir}/"* ]]; then
+  echo "エラー: baseline-scan ファイルが REPORTS_DIR の外にあります。REPORTS_DIR を指定してください。" >&2
+  exit 2
+fi
+if [[ "$_output_dir" != "$_reports_dir" && "$_output_dir" != "${_reports_dir}/"* ]]; then
+  echo "エラー: --output-dir が REPORTS_DIR の外にあります。REPORTS_DIR 配下を指定してください。" >&2
+  exit 2
+fi
+
 # (1) sentry-enrich を再実行: baseline scan.json → watch-enrich_*.json（固定名・上書き）
 echo "[sentry-watch] (1) ベーススキャンを再エンリッチ中..." >&2
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -129,20 +139,6 @@ bash "$_SCRIPT_DIR/docker-enrich.sh" \
 
 echo "" >&2
 echo "[sentry-watch] (2) 差分を検出中..." >&2
-
-# 出力先ディレクトリを決定（デフォルト: watch/ サブディレクトリ）
-if [[ -n "$OUTPUT_DIR" ]]; then
-  mkdir -p "$OUTPUT_DIR"
-  _output_dir="$(cd "$OUTPUT_DIR" && pwd -P)"
-else
-  _output_dir="$_watch_dir"
-fi
-
-# 入力ファイルが reports ルート配下にあることを確認
-if [[ "$BASELINE_ENRICHED_FILE" != "${_reports_dir}/"* ]]; then
-  echo "エラー: baseline-enriched ファイルが REPORTS_DIR の外にあります。REPORTS_DIR を指定してください。" >&2
-  exit 2
-fi
 
 # コンテナ内パスへ変換
 _container_baseline="/workspace/reports/${BASELINE_ENRICHED_FILE#${_reports_dir}/}"

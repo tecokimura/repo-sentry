@@ -21,8 +21,8 @@ https://github.com/tecokimura/repo-sentry
 2. **New repository secret** をクリック
 3. 以下を登録:
 
-| Name | 値 |
-|---|---|
+| Name             | 値                             |
+| ---------------- | ------------------------------ |
 | `OPENAI_API_KEY` | `sk-...`（OpenAI の API キー） |
 
 > `SCAN_TARGET_TOKEN` は今回不要。最初は public repo でテストする。
@@ -39,8 +39,7 @@ https://github.com/tecokimura/repo-sentry
    - **スキャン対象リポジトリ**: `tecokimura/repo-sentry`
 5. 緑の **Run workflow** ボタンをクリック
 
-> 最初のテストは repo-sentry 自身を対象にする。
-> public リポジトリなのでトークン不要で clone できる。
+> 最初のテストは repo-sentry 自身を対象にする。 public リポジトリなのでトークン不要で clone できる。
 
 ---
 
@@ -95,6 +94,7 @@ security-report-XXXXXXXX/
 ```
 
 確認すること:
+
 - `report_*.pdf` をダブルクリックして開ける（文字化けなし・内容あり）
 - `report_*.md` をテキストエディタで開いて内容がある
 - `logs/` フォルダがある
@@ -105,12 +105,12 @@ security-report-XXXXXXXX/
 
 失敗したステップは赤い **✗** で表示される。ステップをクリックしてログの末尾を確認する。
 
-| 失敗したステップ | ログのメッセージ | 対処 |
-|---|---|---|
-| 必須 Secret の確認 | `OPENAI_API_KEY が設定されていません` | Secrets に `OPENAI_API_KEY` を登録 |
-| clone | `Repository not found` | `target_repo` の入力ミス |
-| clone | `Authentication failed` | private repo → `SCAN_TARGET_TOKEN` を登録 |
-| scan → enrich → report | `Unauthorized` / `LLM error` | `OPENAI_API_KEY` の値が間違い・残高不足 |
+| 失敗したステップ       | ログのメッセージ                      | 対処                                      |
+| ---------------------- | ------------------------------------- | ----------------------------------------- |
+| 必須 Secret の確認     | `OPENAI_API_KEY が設定されていません` | Secrets に `OPENAI_API_KEY` を登録        |
+| clone                  | `Repository not found`                | `target_repo` の入力ミス                  |
+| clone                  | `Authentication failed`               | private repo → `SCAN_TARGET_TOKEN` を登録 |
+| scan → enrich → report | `Unauthorized` / `LLM error`          | `OPENAI_API_KEY` の値が間違い・残高不足   |
 
 ---
 
@@ -134,10 +134,10 @@ security-report-XXXXXXXX/
 
 ## 関連ファイル
 
-| ファイル | 内容 |
-|---|---|
-| `.github/workflows/security-scan.yml` | ワークフロー本体 |
-| `scripts/docker-run.sh` | scan → enrich → report 一括実行 |
-| `scripts/docker-export.sh` | report.md → PDF 変換 |
-| `scripts/docker-build.sh` | 4イメージ一括ビルド（ローカル用） |
-| `docs/phase.md` | 全体ロードマップ・設計方針 |
+| ファイル                              | 内容                              |
+| ------------------------------------- | --------------------------------- |
+| `.github/workflows/security-scan.yml` | ワークフロー本体                  |
+| `scripts/docker-run.sh`               | scan → enrich → report 一括実行   |
+| `scripts/docker-export.sh`            | report.md → PDF 変換              |
+| `scripts/docker-build.sh`             | 4イメージ一括ビルド（ローカル用） |
+| `docs/phase.md`                       | 全体ロードマップ・設計方針        |
