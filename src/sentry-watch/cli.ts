@@ -3,6 +3,7 @@ import { runWatch } from "./watcher.ts";
 import type { WatchRequest } from "./watcher.ts";
 import { writeWatchDiffJson } from "./reporters/json.ts";
 import { writeWatchReportMarkdown } from "./reporters/markdown.ts";
+import { sendSlackNotification } from "./reporters/slack.ts";
 import { safeErrorMessage } from "../shared/utils.ts";
 import { dirname } from "../shared/utils.ts";
 
@@ -31,6 +32,16 @@ export async function main(args: string[] = Deno.args): Promise<number> {
 
     await writeWatchDiffJson(diff, jsonPath);
     await writeWatchReportMarkdown(diff, mdPath);
+
+    const webhookUrl = Deno.env.get("SLACK_WEBHOOK_URL");
+    if (webhookUrl) {
+      try {
+        await sendSlackNotification(diff, webhookUrl);
+        console.error("[sentry-watch] Slack 通知: 送信完了");
+      } catch (e) {
+        console.error(`[sentry-watch] Slack 通知: 失敗（${safeErrorMessage(e)}）`);
+      }
+    }
 
     console.error(`[sentry-watch] 完了`);
     console.error(`[sentry-watch] 生成(diff)  : ${jsonPath}`);

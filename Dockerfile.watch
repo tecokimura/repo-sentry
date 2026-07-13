@@ -20,7 +20,8 @@ USER deno
 ENTRYPOINT ["deno", "run", \
   "--allow-read=/app,/workspace", \
   "--allow-write=/workspace/reports,/workspace/.repo-sentry", \
-  "--allow-env=DENO_DIR", \
+  "--allow-env=DENO_DIR,SLACK_WEBHOOK_URL", \
+  "--allow-net=hooks.slack.com", \
   "/app/src/sentry-watch/cli.ts"]
 
 CMD ["--help"]

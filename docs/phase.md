@@ -14,13 +14,13 @@
 - P3-5（sentry-export PDF）: **完了**
 - sentry-watch MVP: **完了**（全 changeType 実装・fixture テスト・watcher.test.ts 済み）
 - sentry-watch baseline 自動切り替え: **完了**（2026-07-13）
+- sentry-watch Slack 通知（オプション）: **完了**（2026-07-13）
 - P3-6 GitHub Actions 初期版: **完了**（2026-07-11 run 29078295479 で全ステップ動作確認済み）
 
 **次の優先課題**:
-1. sentry-watch: Slack / Teams 通知
-2. GitHub Actions 次段階（定期実行 / Slack 通知 / PR コメント）
-3. sentry-enrich: ExploitDB 連携
-4. GitHub Actions: Node.js 20 deprecation 対応（低優先・警告のみ）
+1. GitHub Actions 次段階（定期実行 / Slack 通知 / PR コメント）
+2. sentry-enrich: ExploitDB 連携
+3. GitHub Actions: Node.js 20 deprecation 対応（低優先・警告のみ）
 
 **ブランチ状態**:
 - `develop`: 最新作業ブランチ
@@ -506,7 +506,7 @@ OpenAI（デフォルト）または Ollama を選択可能（Phase 1・2 と同
 | 14 | sentry-watch: watcher.test.ts（fixtures/watch-test/ を使用） | **完了** |
 | 15 | P3-6: GitHub Actions 初期版（workflow_dispatch + Artifacts） | **完了**（2026-07-11） |
 | 16 | sentry-watch: baseline 自動切り替え | **完了**（2026-07-13） |
-| 16b | sentry-watch: Slack / Teams 通知 | 未着手 |
+| 16b | sentry-watch: Slack 通知（オプション） | **完了**（2026-07-13） |
 | 17 | P3-6 次段階: PR コメント / Slack / 定期実行 | 未着手 |
 | 18 | sentry-enrich: ExploitDB 連携 | 未着手 |
 | 19 | GitHub Actions: Node.js 20 deprecation 対応 | 未着手（低優先） |
@@ -751,7 +751,7 @@ scripts/docker-build-watch.sh
 | --------------------------- | ----------------------------------------------------------- |
 | trivy 再実行・新規 CVE 検出 | 対象リポジトリへのアクセスが必要。次フェーズ（B方式）で対応 |
 | 修正版の新規検出            | fixedVersions は trivy 由来。再スキャンなしでは更新されない |
-| Slack / Teams 通知          | 次段階で対応                                                |
+| Slack 通知                  | 実装済み（`SLACK_WEBHOOK_URL` 設定時のみ通知）              |
 | GitHub Actions 定期実行     | 次段階で対応                                                |
 | 自動修正 PR                 | 次段階で対応                                                |
 

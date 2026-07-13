@@ -90,6 +90,12 @@ if [[ -f "${ENV_FILE:-.env}" ]]; then
   _env_file_args=(--env-file "${ENV_FILE:-.env}")
 fi
 
+# SLACK_WEBHOOK_URL が設定されている場合はコンテナに渡す
+_slack_args=()
+if [[ -n "${SLACK_WEBHOOK_URL:-}" ]]; then
+  _slack_args=(-e SLACK_WEBHOOK_URL)
+fi
+
 # watch/ サブディレクトリ（なければ自動作成）
 _watch_dir="${BASELINE_ENRICHED_DIR}/watch"
 mkdir -p "$_watch_dir"
@@ -165,6 +171,7 @@ _watch_exit=0
 docker run --rm \
   --user "$DOCKER_USER" \
   ${_env_file_args[@]+"${_env_file_args[@]}"} \
+  ${_slack_args[@]+"${_slack_args[@]}"} \
   -e DENO_DIR=/workspace/.repo-sentry/deno-cache \
   -v "${_reports_dir}:/workspace/reports" \
   -v "${CACHE_DIR}:/workspace/.repo-sentry" \

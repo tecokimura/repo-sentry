@@ -402,7 +402,7 @@ secret は CLI 引数ではなく環境変数（または `.env` ファイル）
 | 変数                 | 用途                                                           | 必須になる条件                 |
 | -------------------- | -------------------------------------------------------------- | ------------------------------ |
 | `GITHUB_TOKEN`       | GitHub API から repository 情報と Dependabot alerts を取得する | `dependabot` 使用時            |
-| `SLACK_WEBHOOK_URL`  | Slack 通知用                                                   | Slack reporter 実装後          |
+| `SLACK_WEBHOOK_URL`  | Slack 通知用                                                   | sentry-watch で変化あり検出時  |
 | `CLEARWING_PROVIDER` | Clearwing のプロバイダー指定（`openai` または `ollama`）       | 省略時は自動判定               |
 | `OPENAI_API_KEY`     | OpenAI API キー                                                | `CLEARWING_PROVIDER=openai` 時 |
 | `OPENAI_MODEL`       | 使用する OpenAI モデル（既定値: `gpt-4o-mini`）                | 任意                           |
@@ -462,7 +462,7 @@ Compose で使う主な変数:
 | `LOCAL_UID`         | コンテナ実行ユーザーの UID      |
 | `LOCAL_GID`         | コンテナ実行ユーザーの GID      |
 | `GITHUB_TOKEN`      | Dependabot alerts API 用        |
-| `SLACK_WEBHOOK_URL` | Slack 通知用。現時点では未実装  |
+| `SLACK_WEBHOOK_URL` | sentry-watch Slack 通知用       |
 | `OPENAI_API_KEY`    | Clearwing OpenAI プロバイダー用 |
 
 ## CLI の直接実行
@@ -776,10 +776,19 @@ reports/
 
 環境変数:
 
-| 変数           | 説明                                                           |
-| -------------- | -------------------------------------------------------------- |
-| `REPORTS_DIR`  | reports ルートディレクトリ（デフォルト: 入力ファイルの親の親） |
-| `GITHUB_TOKEN` | エンリッチ時の PoC 検索に使用（任意）                          |
+| 変数                | 説明                                                           |
+| ------------------- | -------------------------------------------------------------- |
+| `REPORTS_DIR`       | reports ルートディレクトリ（デフォルト: 入力ファイルの親の親） |
+| `GITHUB_TOKEN`      | エンリッチ時の PoC 検索に使用（任意）                          |
+| `SLACK_WEBHOOK_URL` | Slack 通知用 Webhook URL（任意）。未設定時は通知しない         |
+
+**Slack 通知:** `SLACK_WEBHOOK_URL` が設定され、かつ変化あり（`summary.changed > 0`）の場合のみ通知します。変化なしのときは送信しません。通知失敗は警告ログを出力するのみで watch の終了コードに影響しません。
+
+```bash
+# .env に設定するか、シェル変数として渡す
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/xxx/yyy/zzz \
+  ./scripts/docker-watch.sh scan_*.json enriched_*.json
+```
 
 image は `./scripts/docker-build-watch.sh` で build します（`repo-sentry-watch:local`）。
 
@@ -921,11 +930,19 @@ critical / high のみに絞れます。
 - Artifacts（zip）への成果物保存
 - ワークフロー: `.github/workflows/security-scan.yml`
 
+**sentry-watch baseline 自動切り替え**: 完了（2026-07-13）
+
+- 前回の `watch-enrich_*.json` を次回 baseline として自動使用
+- 削除すれば元の `enriched_*.json` に戻る（リセット）
+
+**sentry-watch Slack 通知**: 完了（2026-07-13）
+
+- `SLACK_WEBHOOK_URL` 設定時のみ通知（オプション）
+- 変化あり時のみ送信、失敗しても exit code に影響しない
+
 未実装または後続予定:
 
-- sentry-watch: baseline 自動切り替え・Slack / Teams 通知
-- ExploitDB 連携
-- Slack reporter
+- sentry-enrich: ExploitDB 連携
 - TruffleHog collector
 - 複数 repository の一括実行
 - GitHub Actions 次段階（定期実行 / Slack 通知 / PR コメント）
