@@ -847,6 +847,13 @@ critical / high のみに絞れます。
 - security-scan workflow（workflow_dispatch + Artifacts）
 - 動作確認手順: [docs/github-actions-test.md](docs/github-actions-test.md)
 
+**GitHub Actions（P3-6）**: 完了（2026-07-11）
+
+- `workflow_dispatch` による手動実行（対象リポジトリを入力）
+- scan → enrich → report → PDF の一括実行
+- Artifacts（zip）への成果物保存
+- ワークフロー: `.github/workflows/security-scan.yml`
+
 未実装または後続予定:
 
 - sentry-watch: baseline 自動切り替え・Slack / Teams 通知
@@ -854,7 +861,7 @@ critical / high のみに絞れます。
 - Slack reporter
 - TruffleHog collector
 - 複数 repository の一括実行
-- GitHub Actions: PR コメント・定期実行（次段階）
+- GitHub Actions 次段階（定期実行 / Slack 通知 / PR コメント）
 
 詳細な設計方針は [docs/tool-recommendations.md](docs/tool-recommendations.md) を参照してください。
 
