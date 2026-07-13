@@ -13,10 +13,11 @@
 - Phase 3（sentry-report）: **完了 / Stable**（実案件検証済み・`--plan-input` 検証済み）
 - P3-5（sentry-export PDF）: **完了**
 - sentry-watch MVP: **完了**（全 changeType 実装・fixture テスト・watcher.test.ts 済み）
+- sentry-watch baseline 自動切り替え: **完了**（2026-07-13）
 - P3-6 GitHub Actions 初期版: **完了**（2026-07-11 run 29078295479 で全ステップ動作確認済み）
 
 **次の優先課題**:
-1. sentry-watch: baseline 自動切り替え・Slack 通知
+1. sentry-watch: Slack / Teams 通知
 2. GitHub Actions 次段階（定期実行 / Slack 通知 / PR コメント）
 3. sentry-enrich: ExploitDB 連携
 4. GitHub Actions: Node.js 20 deprecation 対応（低優先・警告のみ）
@@ -504,7 +505,8 @@ OpenAI（デフォルト）または Ollama を選択可能（Phase 1・2 と同
 | 13 | sentry-watch MVP（全 changeType・fixture テスト） | **完了** |
 | 14 | sentry-watch: watcher.test.ts（fixtures/watch-test/ を使用） | **完了** |
 | 15 | P3-6: GitHub Actions 初期版（workflow_dispatch + Artifacts） | **完了**（2026-07-11） |
-| 16 | sentry-watch: baseline 自動切り替え・Slack 通知 | 未着手 |
+| 16 | sentry-watch: baseline 自動切り替え | **完了**（2026-07-13） |
+| 16b | sentry-watch: Slack / Teams 通知 | 未着手 |
 | 17 | P3-6 次段階: PR コメント / Slack / 定期実行 | 未着手 |
 | 18 | sentry-enrich: ExploitDB 連携 | 未着手 |
 | 19 | GitHub Actions: Node.js 20 deprecation 対応 | 未着手（低優先） |

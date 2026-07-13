@@ -127,12 +127,27 @@ _scan_short="${_scan_stripped%%_*}"
 _scan_after_short="${_scan_stripped#${_scan_short}_}"
 _scan_hash="${_scan_after_short:0:8}"
 
-# watch-enrich_ は固定名（日付なし）で watch/ に配置して毎回上書き
+# watch-enrich_ は固定名（日付なし）で watch/ に配置
 NEW_ENRICHED_FILE="${_watch_dir}/watch-enrich_${_scan_short}_${_scan_hash}.json"
+# 比較後に NEW_ENRICHED_FILE へ昇格させる中間ファイル（失敗時は削除）
+NEW_ENRICHED_TEMP="${_watch_dir}/watch-enrich-tmp_${_scan_short}_${_scan_hash}.json"
+
+# --- baseline 自動切り替え ---
+# watch-enrich が既に存在する場合、前回の再エンリッチ結果を baseline として使用する。
+# watch-enrich を削除すると元の enriched_*.json に戻る（監査・リセット時）。
+if [[ -f "$NEW_ENRICHED_FILE" ]]; then
+  EFFECTIVE_BASELINE_ENRICHED="$NEW_ENRICHED_FILE"
+  echo "[sentry-watch] ベースライン: 前回の watch-enrich（自動切り替え）" >&2
+  echo "[sentry-watch]   ${NEW_ENRICHED_FILE}" >&2
+else
+  EFFECTIVE_BASELINE_ENRICHED="$BASELINE_ENRICHED_FILE"
+  echo "[sentry-watch] ベースライン: 初回実行（元の enriched）" >&2
+  echo "[sentry-watch]   ${BASELINE_ENRICHED_FILE}" >&2
+fi
 
 bash "$_SCRIPT_DIR/docker-enrich.sh" \
   "$BASELINE_SCAN_FILE" \
-  --output "$NEW_ENRICHED_FILE" || {
+  --output "$NEW_ENRICHED_TEMP" || {
   echo "[sentry-watch] エラー: 再エンリッチに失敗しました" >&2
   exit 1
 }
@@ -141,8 +156,8 @@ echo "" >&2
 echo "[sentry-watch] (2) 差分を検出中..." >&2
 
 # コンテナ内パスへ変換
-_container_baseline="/workspace/reports/${BASELINE_ENRICHED_FILE#${_reports_dir}/}"
-_container_new="/workspace/reports/${NEW_ENRICHED_FILE#${_reports_dir}/}"
+_container_baseline="/workspace/reports/${EFFECTIVE_BASELINE_ENRICHED#${_reports_dir}/}"
+_container_new="/workspace/reports/${NEW_ENRICHED_TEMP#${_reports_dir}/}"
 _container_output_dir="/workspace/reports/${_output_dir#${_reports_dir}/}"
 
 # (2) sentry-watch コンテナを呼び出して比較・出力
@@ -160,6 +175,15 @@ docker run --rm \
   --baseline-scan "/workspace/reports/${BASELINE_SCAN_FILE#${_reports_dir}/}" || _watch_exit=$?
 
 _elapsed=$(( SECONDS - _START_SECONDS ))
+
+# 差分検出成功時のみ中間ファイルを昇格（次回の baseline になる）。
+# 失敗時は中間ファイルを削除し、前回の watch-enrich を保持する。
+if [[ $_watch_exit -eq 0 ]]; then
+  mv "$NEW_ENRICHED_TEMP" "$NEW_ENRICHED_FILE"
+else
+  rm -f "$NEW_ENRICHED_TEMP"
+fi
+
 echo "" >&2
 case $_watch_exit in
   0)

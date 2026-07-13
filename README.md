@@ -667,44 +667,111 @@ image は `./scripts/docker-build-export.sh` で build します（`repo-sentry-
 
 ---
 
-## sentry-watch: 継続監視（Phase 4 最小版）
+## sentry-watch: 継続監視
 
-一度スキャンしたリポジトリについて、外部脆弱性 DB（KEV / EPSS / OSV）の変化を検出します。 trivy
-による再スキャンは行わず、既存の `scan_*.json` を sentry-enrich で再エンリッチし、 前回の
-`enriched_*.json` と比較して差分レポートを生成します。対象リポジトリへのアクセスは不要です。
+### 目的・利用用途
+
+一度スキャンしたリポジトリについて、外部脆弱性 DB（KEV / EPSS / OSV）の変化を定期的に検出します。
+trivy による再スキャンは行わず、既存の `scan_*.json` を sentry-enrich で再エンリッチし、
+前回の結果と比較して差分レポートを生成します。対象リポジトリへのアクセスは不要です。
+
+**どんな問題を解決するか:**
+
+脆弱性の危険度は時間とともに変化します。
+
+- 先週は「低リスク」だった CVE が、今週 CISA KEV（実悪用確認済み）に登録されることがある
+- EPSS スコア（悪用確率）が急上昇し、即時対応が必要になることがある
+- 毎週手動で全 CVE を確認するコストは高い
+
+sentry-watch はこれらの変化を自動で検出し「前回から何が変わったか」だけをレポートします。
+
+### 利用パターン
+
+#### パターン 1: 初回実行
+
+`watch/watch-enrich_*.json` が存在しない場合、元の `enriched_*.json` を起点として比較します。
 
 ```bash
-./scripts/docker-watch.sh \
+bash scripts/docker-watch.sh \
   reports/MYAPP-main/scan_myapp_MYAP7C1A26061217.json \
   reports/MYAPP-main/enriched_myapp_MYAP7C1A26061217.json
 ```
 
-出力は `watch/` サブディレクトリにまとまります。
+実行後に `watch/watch-enrich_*.json` が生成され、次回から自動切り替えが有効になります。
+
+#### パターン 2: 継続監視（毎週・定期実行）
+
+**2回目以降は同じコマンドを繰り返すだけです。**
+
+`watch/watch-enrich_*.json` が存在する場合、前回の再エンリッチ結果を baseline として自動的に使用します。
+「今回と前回の差分」だけが出力されるため、既知の変化が毎回再通知されません。
+
+```bash
+# 毎週同じコマンドを実行する（GitHub Actions schedule trigger などで自動化可能）
+bash scripts/docker-watch.sh \
+  reports/MYAPP-main/scan_myapp_MYAP7C1A26061217.json \
+  reports/MYAPP-main/enriched_myapp_MYAP7C1A26061217.json
+```
+
+#### パターン 3: スキャン原点にリセット（監査・棚卸し時）
+
+「初回スキャン以来の全変化を一覧したい」場合は `watch-enrich_*.json` を削除してから実行します。
+
+```bash
+# watch-enrich を削除 → 次回実行時に元の enriched_*.json が baseline に戻る
+rm reports/MYAPP-main/watch/watch-enrich_myapp_MYAP7C1A.json
+bash scripts/docker-watch.sh \
+  reports/MYAPP-main/scan_myapp_MYAP7C1A26061217.json \
+  reports/MYAPP-main/enriched_myapp_MYAP7C1A26061217.json
+```
+
+### baseline 自動切り替えの仕組み
+
+```
+初回:    enriched_*.json ──────────────── diff ◄── 今回の再エンリッチ
+                                                           ↓ 成功時に保存
+                                                  watch-enrich_*.json
+
+2回目:   watch-enrich_*.json（前回）──── diff ◄── 今回の再エンリッチ
+                                                           ↓ 成功時に更新
+                                                  watch-enrich_*.json
+
+3回目以降: 同様に前回の watch-enrich を baseline として使用
+```
+
+差分検出が**成功した場合のみ** `watch-enrich_*.json` を更新します。
+エンリッチ失敗・比較エラー時は前回の状態が保持されます。
+
+### 出力ファイル
 
 ```text
 reports/
   MYAPP-main/
+    scan_myapp_MYAP7C1A26061217.json
+    enriched_myapp_MYAP7C1A26061217.json
     watch/
-      watch-enrich_myapp_MYAP7C1A.json    ← 再エンリッチ結果（固定名・毎回上書き）
-      watch-diff_MYAP7C1A_260710.json     ← 差分データ（機械可読）
-      watch-report_MYAP7C1A_260710.md     ← 差分レポート（人間向け）
+      watch-enrich_myapp_MYAP7C1A.json    ← 最新の再エンリッチ（次回の baseline）
+      watch-diff_MYAP7C1A_260713.json     ← 差分データ（機械可読）
+      watch-report_MYAP7C1A_260713.md     ← 差分レポート（人間向け）
 ```
 
-検出する変化:
+### 検出できる変化
 
-| 変化種別           | 判定条件                                             |
-| ------------------ | ---------------------------------------------------- |
-| `kev_added`        | CISA KEV（既知悪用脆弱性カタログ）に新規登録された   |
-| `urgency_upgraded` | urgency が上昇した（deferred → planned → immediate） |
-| `epss_risen`       | EPSS が 0.05 以上上昇、または 0.4 閾値をまたいだ     |
-| `osv_updated`      | OSV の `modifiedAt` が更新された                     |
-| `new_finding`      | ベースラインにない finding が新たに検出された        |
-| `removed_finding`  | ベースラインにあった finding が消滅した              |
+| 変化種別           | 内容                                                  |
+| ------------------ | ----------------------------------------------------- |
+| `kev_added`        | CISA KEV（既知悪用脆弱性カタログ）に新規登録された    |
+| `urgency_upgraded` | urgency が上昇した（deferred → planned → immediate）  |
+| `epss_risen`       | EPSS が 0.05 以上上昇、または 0.4 閾値をまたいだ      |
+| `osv_updated`      | OSV の `modifiedAt` が更新された                      |
+| `new_finding`      | ベースラインにない finding が新たに検出された         |
+| `removed_finding`  | ベースラインにあった finding が消滅した               |
+
+### オプション
 
 | オプション               | 説明                                                     |
 | ------------------------ | -------------------------------------------------------- |
 | `BASELINE_SCAN_JSON`     | ベーススキャンの `scan_*.json` ファイルパス（必須）      |
-| `BASELINE_ENRICHED_JSON` | 前回の `enriched_*.json` ファイルパス（必須）            |
+| `BASELINE_ENRICHED_JSON` | 初回比較の起点となる `enriched_*.json` パス（必須）      |
 | `--output-dir DIR`       | 出力先ディレクトリ（省略時は `watch/` サブディレクトリ） |
 
 環境変数:
@@ -725,7 +792,7 @@ deno run --allow-read --allow-write src/sentry-watch/cli.ts \
   --output-dir fixtures/watch-test/
 ```
 
-`fixtures/watch-test/` には全 changeType を網羅した合成テストデータが含まれています （`deno test` の
+`fixtures/watch-test/` には全 changeType を網羅した合成テストデータが含まれています（`deno test` の
 `watcher.test.ts` でも使用）。
 
 ---
