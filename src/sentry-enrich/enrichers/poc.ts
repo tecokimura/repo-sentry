@@ -1,4 +1,5 @@
 import type { EnrichedFinding, PocInfo, PocSource } from "../types.ts";
+import { searchExploitDb } from "./exploitdb.ts";
 
 const GITHUB_SEARCH_API = "https://api.github.com/search/repositories";
 
@@ -7,6 +8,49 @@ const RATE_LIMIT_DELAY_MS = 2100;
 
 export interface PocEnrichConfig {
   githubToken?: string;
+  cacheDir?: string;
+}
+
+/**
+ * Exploit-DB CSV をキャッシュ検索して PoC を付与する。
+ * トークン不要・ローカル検索のためレート制限なし。
+ * CVE ID がない finding はスキップ。
+ */
+export async function enrichWithExploitDbPoc(
+  findings: EnrichedFinding[],
+  config: { cacheDir: string },
+): Promise<EnrichedFinding[]> {
+  const results: EnrichedFinding[] = [];
+
+  for (const f of findings) {
+    const cveId = findCveId(f.identifiers);
+    if (!cveId) {
+      results.push(f);
+      continue;
+    }
+
+    const entries = await searchExploitDb(cveId, config.cacheDir);
+    if (entries.length === 0) {
+      results.push(f);
+      continue;
+    }
+
+    const newSources: PocSource[] = entries.map((e) => ({
+      url: e.url,
+      source: "exploitdb" as const,
+      reason: `Exploit-DB #${e.id}: ${e.description}${e.verified ? " (verified)" : ""}`,
+    }));
+
+    const existing = f.poc;
+    const merged: PocInfo = {
+      found: true,
+      confidence: "medium",
+      sources: [...(existing?.sources ?? []), ...newSources],
+    };
+    results.push({ ...f, poc: merged });
+  }
+
+  return results;
 }
 
 /**
