@@ -918,11 +918,6 @@ critical / high のみに絞れます。
 - Docker 実行環境（Dockerfile.watch + docker-watch.sh）
 - fixture テスト（fixtures/watch-test/ + watcher.test.ts）
 
-**GitHub Actions（P3-6 初期版）**: 実装済み
-
-- security-scan workflow（workflow_dispatch + Artifacts）
-- 動作確認手順: [docs/github-actions-test.md](docs/github-actions-test.md)
-
 **GitHub Actions（P3-6）**: 完了（2026-07-11）
 
 - `workflow_dispatch` による手動実行（対象リポジトリを入力）
