@@ -954,7 +954,6 @@ critical / high のみに絞れます。
 
 - TruffleHog collector
 - 複数 repository の一括実行
-- GitHub Actions 次段階（PR コメント）
 
 詳細な設計方針は [docs/tool-recommendations.md](docs/tool-recommendations.md) を参照してください。
 

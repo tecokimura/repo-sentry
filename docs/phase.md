@@ -22,8 +22,11 @@
 **次の優先課題**:
 
 1. Slack 通知の実運用設定（GitHub Secrets に `SLACK_WEBHOOK_URL` を登録するだけ）
-2. GitHub Actions 次段階: PR コメント（短いサマリー設計から）
-3. GitHub Actions: Node.js 20 deprecation 対応（低優先・警告のみ）
+2. GitHub Actions: Node.js 20 deprecation 対応（低優先・警告のみ）
+3. develop → main マージ（v0.4 の区切り）
+
+**方針メモ（2026-07-15）**: PR コメントへの概要貼り付けは当面実施しない。
+通知は Slack + Actions の Artifacts / ログで完結させる方針。
 
 **ブランチ状態**:
 
@@ -513,7 +516,7 @@ OpenAI（デフォルト）または Ollama を選択可能（Phase 1・2 と同
 | 16b    | sentry-watch: Slack 通知（オプション）                       | **完了**（2026-07-13）              |
 | 17     | P3-6 次段階: 定期実行 + Slack 通知（security-watch.yml）     | **完了**（2026-07-15 動作確認済み） |
 | 18     | sentry-enrich: ExploitDB 連携                                | **完了**（2026-07-14）              |
-| 19     | P3-6 次段階: PR コメント                                     | 未着手                              |
+| 19     | P3-6 次段階: PR コメント                                     | 対象外（Slack + ログで完結する方針・2026-07-15） |
 | 20     | GitHub Actions: Node.js 20 deprecation 対応                  | 未着手（低優先）                    |
 
 ---
@@ -592,7 +595,7 @@ workflow_dispatch（手動実行）
 
 - 定期実行 + Slack 通知: **実装済み**（`.github/workflows/security-watch.yml`。毎週月曜 09:00 JST に
   再スキャン → 差分検出 → 変化あり時のみ Slack 通知。前回状態は actions/cache で引き継ぎ）
-- PR コメントへの概要貼り付け: 未着手（別途「短いサマリー」設計が必要なため）
+- PR コメントへの概要貼り付け: **対象外**（Slack + Artifacts / ログで完結する方針・2026-07-15）
 - Teams 通知: 未着手
 
 **既知の軽微な警告（機能影響なし）**:
@@ -771,7 +774,7 @@ trivy 再スキャン → 新規 CVE 検出
   ↓
 enrich 再実行 → 差分検出
   ↓
-Slack / GitHub Actions / PR コメントで通知
+Slack / GitHub Actions（Artifacts・ログ）で通知
 ```
 
 repo-sentry の最終目的は「一度レポートを作るだけでなく、

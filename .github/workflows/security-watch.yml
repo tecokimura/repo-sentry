@@ -36,7 +36,7 @@ jobs:
       # (1) repo-sentry のコードをチェックアウト
       # -------------------------------------------------------
       - name: repo-sentry をチェックアウト
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # -------------------------------------------------------
       # (2) 監視対象を決定（dispatch 入力 > 既定値）
@@ -60,10 +60,10 @@ jobs:
       # (3) Docker image のビルド（security-scan.yml とキャッシュ共有）
       # -------------------------------------------------------
       - name: Docker Buildx セットアップ
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: scan image をビルド
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: Dockerfile
@@ -77,7 +77,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=scan
 
       - name: enrich image をビルド
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: Dockerfile.enrich
@@ -88,7 +88,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=enrich
 
       - name: watch image をビルド
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: Dockerfile.watch
@@ -123,7 +123,7 @@ jobs:
       #     キャッシュが無い/消えた場合は初回扱い（再ベースライン化）。
       # -------------------------------------------------------
       - name: 前回の watch 状態を復元
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: reports
           key: watch-state-${{ steps.target.outputs.slug }}-${{ github.run_id }}
@@ -202,7 +202,7 @@ jobs:
       # (9) 今回の状態を次回のベースラインとして保存
       # -------------------------------------------------------
       - name: watch 状態を保存
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: reports
           key: watch-state-${{ steps.target.outputs.slug }}-${{ github.run_id }}
@@ -212,7 +212,7 @@ jobs:
       # -------------------------------------------------------
       - name: 成果物をアップロード
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: security-watch-${{ github.run_id }}
           path: reports/scan-target/watch/
