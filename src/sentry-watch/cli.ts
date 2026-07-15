@@ -92,13 +92,21 @@ function parseArgs(args: string[]): CliRequest {
 
 /**
  * enriched_{short}_{HASH}{YYMMDDHH} 形式のファイル名からハッシュ部分を抽出する。
+ * rolling baseline（watch-enrich_ プレフィックス）でも同じ識別子になるようにする。
  * 例: enriched_receiveagent_RECE77C1.json → RECE77C1
+ *     watch-enrich_receiveagent_RECE77C1.json → RECE77C1
  */
-function extractHash(filename: string): string {
+export function extractHash(filename: string): string {
   // 拡張子を除去
   const base = filename.endsWith(".json") ? filename.slice(0, -5) : filename;
-  // "enriched_{short}_{rest}" の rest から先頭8文字を取得
-  const stripped = base.startsWith("enriched_") ? base.slice("enriched_".length) : base;
+  // "{prefix}_{short}_{rest}" の rest から先頭8文字を取得
+  let stripped = base;
+  for (const prefix of ["watch-enrich_", "enriched_"]) {
+    if (stripped.startsWith(prefix)) {
+      stripped = stripped.slice(prefix.length);
+      break;
+    }
+  }
   const parts = stripped.split("_");
   if (parts.length >= 2) {
     // _hash は 2番目以降の連結から先頭8文字
