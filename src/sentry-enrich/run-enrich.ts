@@ -18,9 +18,7 @@ export async function runEnrich(request: EnrichRequest): Promise<EnrichedReport>
 
   // DENO_DIR=/workspace/.repo-sentry/deno-cache → 親ディレクトリをキャッシュルートとして使用
   const denoDir = Deno.env.get("DENO_DIR");
-  const cacheDir = denoDir
-    ? denoDir.replace(/\/deno-cache\/?$/, "")
-    : ".repo-sentry";
+  const cacheDir = denoDir ? denoDir.replace(/\/deno-cache\/?$/, "") : ".repo-sentry";
 
   [findings] = await Promise.all([
     enrichWithOsv(findings)

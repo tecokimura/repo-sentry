@@ -703,7 +703,8 @@ bash scripts/docker-watch.sh \
 
 **2回目以降は同じコマンドを繰り返すだけです。**
 
-`watch/watch-enrich_*.json` が存在する場合、前回の再エンリッチ結果を baseline として自動的に使用します。
+`watch/watch-enrich_*.json` が存在する場合、前回の再エンリッチ結果を baseline
+として自動的に使用します。
 「今回と前回の差分」だけが出力されるため、既知の変化が毎回再通知されません。
 
 ```bash
@@ -757,14 +758,14 @@ reports/
 
 ### 検出できる変化
 
-| 変化種別           | 内容                                                  |
-| ------------------ | ----------------------------------------------------- |
-| `kev_added`        | CISA KEV（既知悪用脆弱性カタログ）に新規登録された    |
-| `urgency_upgraded` | urgency が上昇した（deferred → planned → immediate）  |
-| `epss_risen`       | EPSS が 0.05 以上上昇、または 0.4 閾値をまたいだ      |
-| `osv_updated`      | OSV の `modifiedAt` が更新された                      |
-| `new_finding`      | ベースラインにない finding が新たに検出された         |
-| `removed_finding`  | ベースラインにあった finding が消滅した               |
+| 変化種別           | 内容                                                 |
+| ------------------ | ---------------------------------------------------- |
+| `kev_added`        | CISA KEV（既知悪用脆弱性カタログ）に新規登録された   |
+| `urgency_upgraded` | urgency が上昇した（deferred → planned → immediate） |
+| `epss_risen`       | EPSS が 0.05 以上上昇、または 0.4 閾値をまたいだ     |
+| `osv_updated`      | OSV の `modifiedAt` が更新された                     |
+| `new_finding`      | ベースラインにない finding が新たに検出された        |
+| `removed_finding`  | ベースラインにあった finding が消滅した              |
 
 ### オプション
 
@@ -782,7 +783,9 @@ reports/
 | `GITHUB_TOKEN`      | エンリッチ時の PoC 検索に使用（任意）                          |
 | `SLACK_WEBHOOK_URL` | Slack 通知用 Webhook URL（任意）。未設定時は通知しない         |
 
-**Slack 通知:** `SLACK_WEBHOOK_URL` が設定され、かつ変化あり（`summary.changed > 0`）の場合のみ通知します。変化なしのときは送信しません。通知失敗は警告ログを出力するのみで watch の終了コードに影響しません。
+**Slack 通知:** `SLACK_WEBHOOK_URL`
+が設定され、かつ変化あり（`summary.changed > 0`）の場合のみ通知します。変化なしのときは送信しません。通知失敗は警告ログを出力するのみで
+watch の終了コードに影響しません。
 
 ```bash
 # .env に設定するか、シェル変数として渡す

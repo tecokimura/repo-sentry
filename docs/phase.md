@@ -4,10 +4,12 @@
 
 ## このドキュメントの使い方
 
-**新しいセッションで作業を再開する場合はこのファイル（phase.md）だけ読めばよい。**
-実行方法は [README.md](../README.md)、設計メモは [docs/tool-recommendations.md](tool-recommendations.md) を参照（作業再開には不要）。
+**新しいセッションで作業を再開する場合はこのファイル（phase.md）だけ読めばよい。** 実行方法は
+[README.md](../README.md)、設計メモは [docs/tool-recommendations.md](tool-recommendations.md)
+を参照（作業再開には不要）。
 
 **現在の状態（2026-07-13）**:
+
 - Phase 1（sentry-scan）: **完了**
 - Phase 2（sentry-enrich）: **完了**（OSV / KEV / EPSS / 参考 URL 検証）
 - Phase 3（sentry-report）: **完了 / Stable**（実案件検証済み・`--plan-input` 検証済み）
@@ -18,11 +20,13 @@
 - P3-6 GitHub Actions 初期版: **完了**（2026-07-11 run 29078295479 で全ステップ動作確認済み）
 
 **次の優先課題**:
+
 1. GitHub Actions 次段階（定期実行 / Slack 通知 / PR コメント）
 2. sentry-enrich: ExploitDB 連携
 3. GitHub Actions: Node.js 20 deprecation 対応（低優先・警告のみ）
 
 **ブランチ状態**:
+
 - `develop`: 最新作業ブランチ
 - `main`: v0.3 タグ済み
 
@@ -488,28 +492,28 @@ OpenAI（デフォルト）または Ollama を選択可能（Phase 1・2 と同
 
 ## 開発優先順位
 
-| 優先度 | 内容 | 状態 |
-| --- | --- | --- |
-| 1 | sentry-scan: ecosystem / purl / fixedVersions | **完了** |
-| 2 | sentry-enrich: OSV / KEV / EPSS 連携 | **完了** |
-| 3 | sentry-enrich: 参考 URL 検証・canonicalReference 生成 | **完了** |
-| 4 | sentry-report: ReportInput / ReportPlan スキーマ設計 | **完了** |
-| 5 | sentry-report: Markdown 生成・Docker 実行環境 | **完了** |
-| 6 | Phase 3 Stable 宣言（実案件検証・`--plan-input` 検証） | **完了** |
-| 7 | P3-1: executiveSummary ガード強化 | **完了** |
-| 8 | P3-2: PoC-in-GitHub 検知 | **完了** |
-| 9 | P3-3: 実案件 3〜5 件での品質確認 | **完了** |
-| 10 | P3-4: docker-run.sh 一括実行 | **完了** |
-| 11 | P3-5: sentry-export: PDF 生成 | **完了** |
-| 12 | v0.3 リリース（develop → main マージ・タグ） | **完了** |
-| 13 | sentry-watch MVP（全 changeType・fixture テスト） | **完了** |
-| 14 | sentry-watch: watcher.test.ts（fixtures/watch-test/ を使用） | **完了** |
-| 15 | P3-6: GitHub Actions 初期版（workflow_dispatch + Artifacts） | **完了**（2026-07-11） |
-| 16 | sentry-watch: baseline 自動切り替え | **完了**（2026-07-13） |
-| 16b | sentry-watch: Slack 通知（オプション） | **完了**（2026-07-13） |
-| 17 | P3-6 次段階: PR コメント / Slack / 定期実行 | 未着手 |
-| 18 | sentry-enrich: ExploitDB 連携 | 未着手 |
-| 19 | GitHub Actions: Node.js 20 deprecation 対応 | 未着手（低優先） |
+| 優先度 | 内容                                                         | 状態                   |
+| ------ | ------------------------------------------------------------ | ---------------------- |
+| 1      | sentry-scan: ecosystem / purl / fixedVersions                | **完了**               |
+| 2      | sentry-enrich: OSV / KEV / EPSS 連携                         | **完了**               |
+| 3      | sentry-enrich: 参考 URL 検証・canonicalReference 生成        | **完了**               |
+| 4      | sentry-report: ReportInput / ReportPlan スキーマ設計         | **完了**               |
+| 5      | sentry-report: Markdown 生成・Docker 実行環境                | **完了**               |
+| 6      | Phase 3 Stable 宣言（実案件検証・`--plan-input` 検証）       | **完了**               |
+| 7      | P3-1: executiveSummary ガード強化                            | **完了**               |
+| 8      | P3-2: PoC-in-GitHub 検知                                     | **完了**               |
+| 9      | P3-3: 実案件 3〜5 件での品質確認                             | **完了**               |
+| 10     | P3-4: docker-run.sh 一括実行                                 | **完了**               |
+| 11     | P3-5: sentry-export: PDF 生成                                | **完了**               |
+| 12     | v0.3 リリース（develop → main マージ・タグ）                 | **完了**               |
+| 13     | sentry-watch MVP（全 changeType・fixture テスト）            | **完了**               |
+| 14     | sentry-watch: watcher.test.ts（fixtures/watch-test/ を使用） | **完了**               |
+| 15     | P3-6: GitHub Actions 初期版（workflow_dispatch + Artifacts） | **完了**（2026-07-11） |
+| 16     | sentry-watch: baseline 自動切り替え                          | **完了**（2026-07-13） |
+| 16b    | sentry-watch: Slack 通知（オプション）                       | **完了**（2026-07-13） |
+| 17     | P3-6 次段階: PR コメント / Slack / 定期実行                  | 未着手                 |
+| 18     | sentry-enrich: ExploitDB 連携                                | 未着手                 |
+| 19     | GitHub Actions: Node.js 20 deprecation 対応                  | 未着手（低優先）       |
 
 ---
 
@@ -575,13 +579,13 @@ workflow_dispatch（手動実行）
 
 **確定した実装詳細**:
 
-| 項目 | 内容 |
-| --- | --- |
-| Runner | GitHub-hosted（ubuntu-latest） |
+| 項目                   | 内容                                                       |
+| ---------------------- | ---------------------------------------------------------- |
+| Runner                 | GitHub-hosted（ubuntu-latest）                             |
 | 対象リポジトリの渡し方 | `workflow_dispatch` inputs で `target_repo` を入力 → clone |
-| OpenAI API キー | GitHub Secrets（`OPENAI_API_KEY`）経由 |
-| Docker ビルド | `docker/build-push-action@v5` + GHA キャッシュ（scope 別） |
-| 成果物 | `security-report-{run_id}.zip`（reports/ + logs/ を含む） |
+| OpenAI API キー        | GitHub Secrets（`OPENAI_API_KEY`）経由                     |
+| Docker ビルド          | `docker/build-push-action@v5` + GHA キャッシュ（scope 別） |
+| 成果物                 | `security-report-{run_id}.zip`（reports/ + logs/ を含む）  |
 
 **次段階に含めないもの（未着手）**:
 
@@ -590,6 +594,7 @@ workflow_dispatch（手動実行）
 - 定期実行（schedule trigger）
 
 **既知の軽微な警告（機能影響なし）**:
+
 - Node.js 20 deprecation — `actions/checkout@v4` 等を新メジャーへ更新すると解消（低優先）
 
 ---
