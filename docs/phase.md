@@ -21,8 +21,8 @@
 
 **次の優先課題**:
 
-1. GitHub Actions 次段階（定期実行 / Slack 通知 / PR コメント）
-2. sentry-enrich: ExploitDB 連携
+1. GitHub Actions 定期 watch（security-watch.yml）の動作確認・Slack 通知の実運用設定
+2. GitHub Actions 次段階: PR コメント（短いサマリー設計から）
 3. GitHub Actions: Node.js 20 deprecation 対応（低優先・警告のみ）
 
 **ブランチ状態**:
@@ -492,28 +492,29 @@ OpenAI（デフォルト）または Ollama を選択可能（Phase 1・2 と同
 
 ## 開発優先順位
 
-| 優先度 | 内容                                                         | 状態                   |
-| ------ | ------------------------------------------------------------ | ---------------------- |
-| 1      | sentry-scan: ecosystem / purl / fixedVersions                | **完了**               |
-| 2      | sentry-enrich: OSV / KEV / EPSS 連携                         | **完了**               |
-| 3      | sentry-enrich: 参考 URL 検証・canonicalReference 生成        | **完了**               |
-| 4      | sentry-report: ReportInput / ReportPlan スキーマ設計         | **完了**               |
-| 5      | sentry-report: Markdown 生成・Docker 実行環境                | **完了**               |
-| 6      | Phase 3 Stable 宣言（実案件検証・`--plan-input` 検証）       | **完了**               |
-| 7      | P3-1: executiveSummary ガード強化                            | **完了**               |
-| 8      | P3-2: PoC-in-GitHub 検知                                     | **完了**               |
-| 9      | P3-3: 実案件 3〜5 件での品質確認                             | **完了**               |
-| 10     | P3-4: docker-run.sh 一括実行                                 | **完了**               |
-| 11     | P3-5: sentry-export: PDF 生成                                | **完了**               |
-| 12     | v0.3 リリース（develop → main マージ・タグ）                 | **完了**               |
-| 13     | sentry-watch MVP（全 changeType・fixture テスト）            | **完了**               |
-| 14     | sentry-watch: watcher.test.ts（fixtures/watch-test/ を使用） | **完了**               |
-| 15     | P3-6: GitHub Actions 初期版（workflow_dispatch + Artifacts） | **完了**（2026-07-11） |
-| 16     | sentry-watch: baseline 自動切り替え                          | **完了**（2026-07-13） |
-| 16b    | sentry-watch: Slack 通知（オプション）                       | **完了**（2026-07-13） |
-| 17     | P3-6 次段階: PR コメント / Slack / 定期実行                  | 未着手                 |
-| 18     | sentry-enrich: ExploitDB 連携                                | 未着手                 |
-| 19     | GitHub Actions: Node.js 20 deprecation 対応                  | 未着手（低優先）       |
+| 優先度 | 内容                                                         | 状態                       |
+| ------ | ------------------------------------------------------------ | -------------------------- |
+| 1      | sentry-scan: ecosystem / purl / fixedVersions                | **完了**                   |
+| 2      | sentry-enrich: OSV / KEV / EPSS 連携                         | **完了**                   |
+| 3      | sentry-enrich: 参考 URL 検証・canonicalReference 生成        | **完了**                   |
+| 4      | sentry-report: ReportInput / ReportPlan スキーマ設計         | **完了**                   |
+| 5      | sentry-report: Markdown 生成・Docker 実行環境                | **完了**                   |
+| 6      | Phase 3 Stable 宣言（実案件検証・`--plan-input` 検証）       | **完了**                   |
+| 7      | P3-1: executiveSummary ガード強化                            | **完了**                   |
+| 8      | P3-2: PoC-in-GitHub 検知                                     | **完了**                   |
+| 9      | P3-3: 実案件 3〜5 件での品質確認                             | **完了**                   |
+| 10     | P3-4: docker-run.sh 一括実行                                 | **完了**                   |
+| 11     | P3-5: sentry-export: PDF 生成                                | **完了**                   |
+| 12     | v0.3 リリース（develop → main マージ・タグ）                 | **完了**                   |
+| 13     | sentry-watch MVP（全 changeType・fixture テスト）            | **完了**                   |
+| 14     | sentry-watch: watcher.test.ts（fixtures/watch-test/ を使用） | **完了**                   |
+| 15     | P3-6: GitHub Actions 初期版（workflow_dispatch + Artifacts） | **完了**（2026-07-11）     |
+| 16     | sentry-watch: baseline 自動切り替え                          | **完了**（2026-07-13）     |
+| 16b    | sentry-watch: Slack 通知（オプション）                       | **完了**（2026-07-13）     |
+| 17     | P3-6 次段階: 定期実行 + Slack 通知（security-watch.yml）     | **実装済み（動作確認中）** |
+| 18     | sentry-enrich: ExploitDB 連携                                | **完了**（2026-07-14）     |
+| 19     | P3-6 次段階: PR コメント                                     | 未着手                     |
+| 20     | GitHub Actions: Node.js 20 deprecation 対応                  | 未着手（低優先）           |
 
 ---
 
@@ -587,11 +588,12 @@ workflow_dispatch（手動実行）
 | Docker ビルド          | `docker/build-push-action@v5` + GHA キャッシュ（scope 別） |
 | 成果物                 | `security-report-{run_id}.zip`（reports/ + logs/ を含む）  |
 
-**次段階に含めないもの（未着手）**:
+**次段階の状況**:
 
-- PR コメントへの概要貼り付け（別途「短いサマリー」設計が必要なため）
-- Slack / Teams 通知
-- 定期実行（schedule trigger）
+- 定期実行 + Slack 通知: **実装済み**（`.github/workflows/security-watch.yml`。毎週月曜 09:00 JST に
+  再スキャン → 差分検出 → 変化あり時のみ Slack 通知。前回状態は actions/cache で引き継ぎ）
+- PR コメントへの概要貼り付け: 未着手（別途「短いサマリー」設計が必要なため）
+- Teams 通知: 未着手
 
 **既知の軽微な警告（機能影響なし）**:
 

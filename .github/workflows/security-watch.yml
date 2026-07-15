@@ -1,0 +1,219 @@
+name: Security Watch
+
+# 定期的に対象リポジトリを再スキャンし、前回結果との差分（KEV 新規登録 / urgency 上昇 /
+# EPSS 上昇 / OSV 更新 / 新規・消滅 finding）を検出する。
+# 変化があり SLACK_WEBHOOK_URL secret が設定されていれば Slack に通知する。
+# LLM は使用しないため OPENAI_API_KEY は不要。
+
+on:
+  schedule:
+    - cron: "0 0 * * 1" # 毎週月曜 09:00 JST
+  workflow_dispatch:
+    inputs:
+      target_repo:
+        description: "監視対象リポジトリ (owner/repo 形式。省略時は既定値)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-watch
+  cancel-in-progress: false
+
+env:
+  # schedule 実行時の監視対象（変更する場合はここを編集）
+  DEFAULT_TARGET_REPO: tecokimura/repo-sentry
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      # -------------------------------------------------------
+      # (1) repo-sentry のコードをチェックアウト
+      # -------------------------------------------------------
+      - name: repo-sentry をチェックアウト
+        uses: actions/checkout@v4
+
+      # -------------------------------------------------------
+      # (2) 監視対象を決定（dispatch 入力 > 既定値）
+      # -------------------------------------------------------
+      - name: 監視対象を決定
+        id: target
+        env:
+          INPUT_REPO: ${{ inputs.target_repo }}
+        run: |
+          TARGET_REPO="${INPUT_REPO:-$DEFAULT_TARGET_REPO}"
+          # 形式チェック: owner/repo のみ許可（コマンドインジェクション対策）
+          if [[ ! "$TARGET_REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+$ ]]; then
+            echo "::error::target_repo の形式が不正です: ${TARGET_REPO}  ('owner/repo' 形式で入力してください)"
+            exit 1
+          fi
+          echo "repo=$TARGET_REPO" >> "$GITHUB_OUTPUT"
+          # キャッシュキー用スラッグ（/ を - に変換）
+          echo "slug=${TARGET_REPO//\//-}" >> "$GITHUB_OUTPUT"
+
+      # -------------------------------------------------------
+      # (3) Docker image のビルド（security-scan.yml とキャッシュ共有）
+      # -------------------------------------------------------
+      - name: Docker Buildx セットアップ
+        uses: docker/setup-buildx-action@v3
+
+      - name: scan image をビルド
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          load: true
+          tags: repo-sentry:local
+          build-args: |
+            DENO_VERSION=2.5.6
+            GITLEAKS_VERSION=8.30.1
+            TRIVY_VERSION=0.70.0
+          cache-from: type=gha,scope=scan
+          cache-to: type=gha,mode=max,scope=scan
+
+      - name: enrich image をビルド
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.enrich
+          load: true
+          tags: repo-sentry-enrich:local
+          build-args: DENO_VERSION=2.5.6
+          cache-from: type=gha,scope=enrich
+          cache-to: type=gha,mode=max,scope=enrich
+
+      - name: watch image をビルド
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.watch
+          load: true
+          tags: repo-sentry-watch:local
+          build-args: DENO_VERSION=2.5.6
+          cache-from: type=gha,scope=watch
+          cache-to: type=gha,mode=max,scope=watch
+
+      # -------------------------------------------------------
+      # (4) 監視対象リポジトリを clone
+      # -------------------------------------------------------
+      - name: 監視対象リポジトリを clone
+        env:
+          TARGET_REPO: ${{ steps.target.outputs.repo }}
+          SCAN_TARGET_TOKEN: ${{ secrets.SCAN_TARGET_TOKEN }}
+        run: |
+          if [[ -n "$SCAN_TARGET_TOKEN" ]]; then
+            git clone --depth=1 \
+              "https://x-access-token:${SCAN_TARGET_TOKEN}@github.com/${TARGET_REPO}" \
+              ./scan-target
+          else
+            git clone --depth=1 \
+              "https://github.com/${TARGET_REPO}" \
+              ./scan-target
+          fi
+
+      # -------------------------------------------------------
+      # (5) 前回の watch 状態を復元
+      #     reports/scan-target/ に前回の enriched_*.json と
+      #     watch/watch-enrich_*.json（rolling baseline）が入る。
+      #     キャッシュが無い/消えた場合は初回扱い（再ベースライン化）。
+      # -------------------------------------------------------
+      - name: 前回の watch 状態を復元
+        uses: actions/cache/restore@v4
+        with:
+          path: reports
+          key: watch-state-${{ steps.target.outputs.slug }}-${{ github.run_id }}
+          restore-keys: |
+            watch-state-${{ steps.target.outputs.slug }}-
+
+      # -------------------------------------------------------
+      # (6) 新規スキャン
+      #     DATE_FORMAT=none でファイル名を固定し、前回の scan_*.json を上書きする
+      # -------------------------------------------------------
+      - name: 新規スキャン
+        env:
+          REPORTS_DIR: ${{ github.workspace }}/reports
+          DATE_FORMAT: none
+        run: |
+          _scan_exit=0
+          bash scripts/docker-scan.sh ./scan-target --format json || _scan_exit=$?
+          # 0: finding なし / 1: finding あり → どちらも続行。2 以上はエラー
+          if [[ $_scan_exit -ge 2 ]]; then
+            echo "::error::scan が終了コード ${_scan_exit} で失敗しました"
+            exit $_scan_exit
+          fi
+
+      # -------------------------------------------------------
+      # (7) ベースラインを準備
+      #     enriched_*.json が無い場合（初回 or キャッシュ消失）のみ enrich を実行して作成
+      # -------------------------------------------------------
+      - name: ベースラインを準備
+        id: baseline
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPORTS_DIR: ${{ github.workspace }}/reports
+          DATE_FORMAT: none
+        run: |
+          shopt -s nullglob
+          _scan_files=(reports/scan-target/scan_*.json)
+          # SBOM を除外して scan json を特定
+          SCAN_JSON=""
+          for f in "${_scan_files[@]}"; do
+            [[ "$f" == *.sbom.cdx.json ]] && continue
+            SCAN_JSON="$f"
+          done
+          if [[ -z "$SCAN_JSON" ]]; then
+            echo "::error::scan_*.json が見つかりません"
+            exit 1
+          fi
+          echo "scan_json=$SCAN_JSON" >> "$GITHUB_OUTPUT"
+
+          _enriched=(reports/scan-target/enriched_*.json)
+          if [[ ${#_enriched[@]} -eq 0 ]]; then
+            echo "初回実行: ベースライン enriched を作成します"
+            _sbom_args=()
+            _sbom=(reports/scan-target/scan_*.sbom.cdx.json)
+            [[ ${#_sbom[@]} -gt 0 ]] && _sbom_args=(--sbom "${_sbom[0]}")
+            bash scripts/docker-enrich.sh "$SCAN_JSON" ${_sbom_args[@]+"${_sbom_args[@]}"}
+            _enriched=(reports/scan-target/enriched_*.json)
+          fi
+          echo "enriched_json=${_enriched[0]}" >> "$GITHUB_OUTPUT"
+
+      # -------------------------------------------------------
+      # (8) 差分検出（docker-watch.sh）
+      #     新規スキャンを再エンリッチし、前回の watch-enrich（rolling baseline）と比較。
+      #     変化があり SLACK_WEBHOOK_URL が設定されていれば Slack に通知される。
+      # -------------------------------------------------------
+      - name: 差分検出と Slack 通知
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          REPORTS_DIR: ${{ github.workspace }}/reports
+        run: |
+          bash scripts/docker-watch.sh \
+            "${{ steps.baseline.outputs.scan_json }}" \
+            "${{ steps.baseline.outputs.enriched_json }}"
+
+      # -------------------------------------------------------
+      # (9) 今回の状態を次回のベースラインとして保存
+      # -------------------------------------------------------
+      - name: watch 状態を保存
+        uses: actions/cache/save@v4
+        with:
+          path: reports
+          key: watch-state-${{ steps.target.outputs.slug }}-${{ github.run_id }}
+
+      # -------------------------------------------------------
+      # (10) 差分レポートを Artifacts に保存
+      # -------------------------------------------------------
+      - name: 成果物をアップロード
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-watch-${{ github.run_id }}
+          path: reports/scan-target/watch/
+          retention-days: 90

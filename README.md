@@ -938,12 +938,23 @@ critical / high のみに絞れます。
 - `SLACK_WEBHOOK_URL` 設定時のみ通知（オプション）
 - 変化あり時のみ送信、失敗しても exit code に影響しない
 
+**sentry-enrich Exploit-DB 連携**: 完了（2026-07-14）
+
+- Exploit-DB の公開 CSV をローカルキャッシュして CVE に対応する PoC を検索（7 日 TTL）
+- トークン不要・GitHub Search の前段として実行
+
+**GitHub Actions 定期 watch（security-watch.yml）**: 実装済み
+
+- 毎週月曜 09:00 JST に対象リポジトリを再スキャンし、前回との差分を検出
+- 変化があり `SLACK_WEBHOOK_URL` secret が設定されていれば Slack に通知
+- 前回状態（baseline）は actions/cache で引き継ぎ。LLM 不要（OPENAI_API_KEY 不使用）
+- `workflow_dispatch` で手動実行も可能
+
 未実装または後続予定:
 
-- sentry-enrich: ExploitDB 連携
 - TruffleHog collector
 - 複数 repository の一括実行
-- GitHub Actions 次段階（定期実行 / Slack 通知 / PR コメント）
+- GitHub Actions 次段階（PR コメント）
 
 詳細な設計方針は [docs/tool-recommendations.md](docs/tool-recommendations.md) を参照してください。
 
