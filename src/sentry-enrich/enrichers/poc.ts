@@ -1,10 +1,17 @@
-import type { EnrichedFinding, PocInfo, PocSource } from "../types.ts";
+import type { EnrichedFinding, PocConfidence, PocInfo, PocSource } from "../types.ts";
 import { searchExploitDb } from "./exploitdb.ts";
 
 const GITHUB_SEARCH_API = "https://api.github.com/search/repositories";
 
 // 1リクエストあたりの待機時間（ms）。未認証: 6000ms, 認証済み: 2000ms
 const RATE_LIMIT_DELAY_MS = 2100;
+
+const CONFIDENCE_RANK: Record<PocConfidence, number> = { low: 0, medium: 1, high: 2 };
+
+/** 既存の confidence を下げないよう、高い方を採用する */
+export function maxConfidence(a: PocConfidence, b: PocConfidence): PocConfidence {
+  return CONFIDENCE_RANK[a] >= CONFIDENCE_RANK[b] ? a : b;
+}
 
 export interface PocEnrichConfig {
   githubToken?: string;
@@ -44,7 +51,8 @@ export async function enrichWithExploitDbPoc(
     const existing = f.poc;
     const merged: PocInfo = {
       found: true,
-      confidence: "medium",
+      // OSV 由来で high が付いている場合に medium へ降格させない
+      confidence: maxConfidence(existing?.confidence ?? "low", "medium"),
       sources: [...(existing?.sources ?? []), ...newSources],
     };
     results.push({ ...f, poc: merged });
