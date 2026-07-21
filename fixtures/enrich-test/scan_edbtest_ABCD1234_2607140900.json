@@ -1,0 +1,76 @@
+{
+  "scanId": "edbtest-0000-0000-0000-000000000001",
+  "profile": "default",
+  "repository": "fixtures/enrich-test",
+  "path": "/fixtures/enrich-test",
+  "scannedAt": "2026-07-14T09:00:00Z",
+  "toolVersions": {
+    "trivy": "0.0.0-fixture"
+  },
+  "summary": {
+    "critical": 2,
+    "high": 1,
+    "medium": 0,
+    "low": 0,
+    "info": 0,
+    "unknown": 0
+  },
+  "collectorStatuses": [
+    {
+      "tool": "trivy",
+      "status": "completed",
+      "startedAt": "2026-07-14T09:00:00Z",
+      "finishedAt": "2026-07-14T09:00:01Z",
+      "durationMs": 1000,
+      "findingsCount": 3,
+      "notes": ["fixture data for ExploitDB integration test"]
+    }
+  ],
+  "findings": [
+    {
+      "id": "edbtest-finding-001",
+      "tool": "trivy",
+      "category": "dependency-vulnerability",
+      "severity": "critical",
+      "title": "CVE-2021-44228: Apache Log4j2 Remote Code Execution (Log4Shell)",
+      "description": "Apache Log4j2 2.0-beta9 through 2.15.0 (excluding 2.12.2, 2.16.0) JNDI features do not protect against attacker controlled LDAP and other JNDI related endpoints.",
+      "status": "open",
+      "identifiers": ["CVE-2021-44228"],
+      "packageName": "org.apache.logging.log4j:log4j-core",
+      "packageVersion": "2.14.1",
+      "ecosystem": "maven",
+      "purl": "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1",
+      "fixedVersions": ["2.15.0"]
+    },
+    {
+      "id": "edbtest-finding-002",
+      "tool": "trivy",
+      "category": "dependency-vulnerability",
+      "severity": "critical",
+      "title": "CVE-2017-5638: Apache Struts2 Remote Code Execution",
+      "description": "The Jakarta Multipart parser in Apache Struts 2 2.3.x before 2.3.32 and 2.5.x before 2.5.10.1 has incorrect exception handling and error-message generation during file-upload attempts, which allows remote attackers to execute arbitrary commands via crafted Content-Type, Content-Disposition, or Content-Length HTTP header values.",
+      "status": "open",
+      "identifiers": ["CVE-2017-5638"],
+      "packageName": "org.apache.struts:struts2-core",
+      "packageVersion": "2.3.20",
+      "ecosystem": "maven",
+      "purl": "pkg:maven/org.apache.struts/struts2-core@2.3.20",
+      "fixedVersions": ["2.3.32", "2.5.10.1"]
+    },
+    {
+      "id": "edbtest-finding-003",
+      "tool": "trivy",
+      "category": "dependency-vulnerability",
+      "severity": "high",
+      "title": "CVE-2022-22965: Spring Framework Remote Code Execution (Spring4Shell)",
+      "description": "A Spring MVC or Spring WebFlux application running on JDK 9+ may be vulnerable to remote code execution (RCE) via data binding.",
+      "status": "open",
+      "identifiers": ["CVE-2022-22965"],
+      "packageName": "org.springframework:spring-webmvc",
+      "packageVersion": "5.3.17",
+      "ecosystem": "maven",
+      "purl": "pkg:maven/org.springframework/spring-webmvc@5.3.17",
+      "fixedVersions": ["5.3.18", "5.2.20"]
+    }
+  ]
+}
