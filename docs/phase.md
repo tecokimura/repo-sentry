@@ -8,10 +8,11 @@
 [README.md](../README.md)、設計メモは [docs/tool-recommendations.md](tool-recommendations.md)
 を参照（作業再開には不要）。
 
-**現在の状態（2026-07-13）**:
+**現在の状態（2026-07-21）**:
 
 - Phase 1（sentry-scan）: **完了**
-- Phase 2（sentry-enrich）: **完了**（OSV / KEV / EPSS / 参考 URL 検証）
+- Phase 2（sentry-enrich）: **完了**（OSV / KEV / EPSS / 参考 URL 検証 / ExploitDB PoC）
+- sentry-enrich ExploitDB 連携: **完了**（2026-07-21 動作確認済み・25,053 CVE エントリ）
 - Phase 3（sentry-report）: **完了 / Stable**（実案件検証済み・`--plan-input` 検証済み）
 - P3-5（sentry-export PDF）: **完了**
 - sentry-watch MVP: **完了**（全 changeType 実装・fixture テスト・watcher.test.ts 済み）
