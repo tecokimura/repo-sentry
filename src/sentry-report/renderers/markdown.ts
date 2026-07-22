@@ -721,13 +721,13 @@ function detectSummaryConflicts(
 function riskLabel(risk: string): string {
   switch (risk) {
     case "critical":
-      return "🔴 Critical";
+      return "Critical";
     case "high":
-      return "🟠 High";
+      return "High";
     case "medium":
-      return "🟡 Medium";
+      return "Medium";
     default:
-      return "🟢 Low";
+      return "Low";
   }
 }
 
