@@ -19,15 +19,15 @@ export async function enrichWithClearwing(
   const timing = startCollector();
 
   const openaiApiKey = request.clearwing?.openaiApiKey;
-  const provider = request.clearwing?.provider
-    ?? (openaiApiKey ? "openai" : "ollama");
+  const provider = request.clearwing?.provider ??
+    (openaiApiKey ? "openai" : "ollama");
   const host = provider === "openai"
     ? DEFAULT_OPENAI_HOST
     : (request.clearwing?.ollamaHost ?? DEFAULT_OLLAMA_HOST);
   const model = provider === "openai"
     ? (request.clearwing?.openaiModel ?? DEFAULT_OPENAI_MODEL)
     : (request.clearwing?.ollamaModel ?? DEFAULT_OLLAMA_MODEL);
-  const depth = request.clearwing?.depth ?? "standard";  // priority / standard / verbose
+  const depth = request.clearwing?.depth ?? "standard"; // priority / standard / verbose
   const targets = filterByDepth(findings, depth);
 
   if (targets.length === 0) {
@@ -82,11 +82,19 @@ export async function enrichWithClearwing(
       const sections = await analyzeOnce(host, model, finding, openaiApiKey);
       enrichedFindings.push({ ...finding, ...sections });
       enrichedCount++;
-      console.error(`[clearwing] <DONE> (${current}/${total}): ${label} [${severity}] (${formatDuration(Math.floor((Date.now() - findingStart) / 1000))})`);
+      console.error(
+        `[clearwing] <DONE> (${current}/${total}): ${label} [${severity}] (${
+          formatDuration(Math.floor((Date.now() - findingStart) / 1000))
+        })`,
+      );
     } catch {
       enrichedFindings.push(finding);
       failedCount++;
-      console.error(`[clearwing] <FAIL> (${current}/${total}): ${label} [${severity}] (${formatDuration(Math.floor((Date.now() - findingStart) / 1000))})`);
+      console.error(
+        `[clearwing] <FAIL> (${current}/${total}): ${label} [${severity}] (${
+          formatDuration(Math.floor((Date.now() - findingStart) / 1000))
+        })`,
+      );
     }
   }
 

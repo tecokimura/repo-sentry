@@ -1,0 +1,595 @@
+{
+  "scanId": "edbtest-0000-0000-0000-000000000001",
+  "enrichId": "3be37222-a715-458e-b196-98e8890c6b20",
+  "profile": "default",
+  "repository": "fixtures/enrich-test",
+  "path": "/fixtures/enrich-test",
+  "scannedAt": "2026-07-14T09:00:00Z",
+  "enrichedAt": "2026-07-21T09:56:31.489Z",
+  "toolVersions": {
+    "trivy": "0.0.0-fixture"
+  },
+  "summary": {
+    "critical": 2,
+    "high": 1,
+    "medium": 0,
+    "low": 0,
+    "info": 0,
+    "unknown": 0
+  },
+  "collectorStatuses": [
+    {
+      "tool": "trivy",
+      "status": "completed",
+      "startedAt": "2026-07-14T09:00:00Z",
+      "finishedAt": "2026-07-14T09:00:01Z",
+      "durationMs": 1000,
+      "findingsCount": 3,
+      "notes": [
+        "fixture data for ExploitDB integration test"
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "edbtest-finding-001",
+      "tool": "trivy",
+      "category": "dependency-vulnerability",
+      "severity": "critical",
+      "title": "CVE-2021-44228: Apache Log4j2 Remote Code Execution (Log4Shell)",
+      "description": "Apache Log4j2 2.0-beta9 through 2.15.0 (excluding 2.12.2, 2.16.0) JNDI features do not protect against attacker controlled LDAP and other JNDI related endpoints.",
+      "status": "open",
+      "identifiers": [
+        "CVE-2021-44228"
+      ],
+      "packageName": "org.apache.logging.log4j:log4j-core",
+      "packageVersion": "2.14.1",
+      "ecosystem": "maven",
+      "purl": "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1",
+      "fixedVersions": [
+        "2.15.0"
+      ],
+      "osv": {
+        "id": "CVE-2021-44228",
+        "aliases": [
+          "GHSA-jfh8-c2jp-5v3q"
+        ],
+        "publishedAt": "2021-12-10T10:15:09.143Z",
+        "modifiedAt": "2026-07-08T06:01:28.976220101Z",
+        "references": [
+          {
+            "type": "WEB",
+            "url": "https://github.com/cisagov/log4j-affected-db/blob/develop/SOFTWARE-LIST.md"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "http://packetstormsecurity.com/files/165225/Apache-Log4j2-2.14.1-Remote-Code-Execution.html"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "http://packetstormsecurity.com/files/165260/VMware-Security-Advisory-2021-0028.html"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "http://packetstormsecurity.com/files/165281/Log4j2-Log4Shell-Regexes.html"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "http://packetstormsecurity.com/files/165282/Log4j-Payload-Generator.html"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "http://packetstormsecurity.com/files/165306/L4sh-Log4j-Remote-Code-Execution.html"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "http://packetstormsecurity.com/files/165307/Log4j-Remote-Code-Execution-Word-Bypassing.html"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "http://packetstormsecurity.com/files/165311/log4j-scan-Extensive-Scanner.html"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "http://packetstormsecurity.com/files/167794/Open-Xchange-App-Suite-7.10.x-Cross-Site-Scripting-Command-Injection.html"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "http://packetstormsecurity.com/files/171626/AD-Manager-Plus-7122-Remote-Code-Execution.html"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "http://seclists.org/fulldisclosure/2022/Jul/11"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "http://seclists.org/fulldisclosure/2022/Mar/23"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "http://www.openwall.com/lists/oss-security/2021/12/10/1"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "http://www.openwall.com/lists/oss-security/2021/12/10/2"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "http://www.openwall.com/lists/oss-security/2021/12/10/3"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "http://www.openwall.com/lists/oss-security/2021/12/13/1"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "http://www.openwall.com/lists/oss-security/2021/12/13/2"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "http://www.openwall.com/lists/oss-security/2021/12/14/4"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "http://www.openwall.com/lists/oss-security/2021/12/15/3"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://cert-portal.siemens.com/productcert/pdf/ssa-397453.pdf"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://cert-portal.siemens.com/productcert/pdf/ssa-479842.pdf"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://cert-portal.siemens.com/productcert/pdf/ssa-661247.pdf"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://cert-portal.siemens.com/productcert/pdf/ssa-714170.pdf"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://github.com/cisagov/log4j-affected-db"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://lists.debian.org/debian-lts-announce/2021/12/msg00007.html"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/M5CSVUNV4HWZZXGOKNSK6L7RPM7BOKIB/"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/VU57UJDCFIASIO35GC55JMKSRXJMCDFM/"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://logging.apache.org/log4j/2.x/security.html"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://psirt.global.sonicwall.com/vuln-detail/SNWLID-2021-0032"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://security.netapp.com/advisory/ntap-20211210-0007/"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://support.apple.com/kb/HT213189"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://tools.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-apache-log4j-qRuKNEbd"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://www.bentley.com/en/common-vulnerability-exposure/be-2022-0001"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://www.cisa.gov/known-exploited-vulnerabilities-catalog?field_cve=CVE-2021-44228"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://www.debian.org/security/2021/dsa-5020"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://www.intel.com/content/www/us/en/security-center/advisory/intel-sa-00646.html"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://www.kb.cert.org/vuls/id/930724"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://www.oracle.com/security-alerts/alert-cve-2021-44228.html"
+          },
+          {
+            "type": "FIX",
+            "url": "https://msrc-blog.microsoft.com/2021/12/11/microsofts-response-to-cve-2021-44228-apache-log4j2/"
+          },
+          {
+            "type": "FIX",
+            "url": "https://www.oracle.com/security-alerts/cpuapr2022.html"
+          },
+          {
+            "type": "FIX",
+            "url": "https://www.oracle.com/security-alerts/cpujan2022.html"
+          },
+          {
+            "type": "EVIDENCE",
+            "url": "http://packetstormsecurity.com/files/165261/Apache-Log4j2-2.14.1-Information-Disclosure.html"
+          },
+          {
+            "type": "EVIDENCE",
+            "url": "http://packetstormsecurity.com/files/165270/Apache-Log4j2-2.14.1-Remote-Code-Execution.html"
+          },
+          {
+            "type": "EVIDENCE",
+            "url": "http://packetstormsecurity.com/files/165371/VMware-Security-Advisory-2021-0028.4.html"
+          },
+          {
+            "type": "EVIDENCE",
+            "url": "http://packetstormsecurity.com/files/165532/Log4Shell-HTTP-Header-Injection.html"
+          },
+          {
+            "type": "EVIDENCE",
+            "url": "http://packetstormsecurity.com/files/165642/VMware-vCenter-Server-Unauthenticated-Log4Shell-JNDI-Injection-Remote-Code-Execution.html"
+          },
+          {
+            "type": "EVIDENCE",
+            "url": "http://packetstormsecurity.com/files/165673/UniFi-Network-Application-Unauthenticated-Log4Shell-Remote-Code-Execution.html"
+          },
+          {
+            "type": "EVIDENCE",
+            "url": "http://packetstormsecurity.com/files/167917/MobileIron-Log4Shell-Remote-Command-Execution.html"
+          },
+          {
+            "type": "EVIDENCE",
+            "url": "http://seclists.org/fulldisclosure/2022/Dec/2"
+          },
+          {
+            "type": "EVIDENCE",
+            "url": "https://github.com/nu11secur1ty/CVE-mitre/tree/main/CVE-2021-44228"
+          },
+          {
+            "type": "EVIDENCE",
+            "url": "https://twitter.com/kurtseifried/status/1469345530182455296"
+          },
+          {
+            "type": "EVIDENCE",
+            "url": "https://www.nu11secur1ty.com/2021/12/cve-2021-44228.html"
+          }
+        ]
+      },
+      "kev": {
+        "cveId": "CVE-2021-44228",
+        "vendorProject": "Apache",
+        "product": "Log4j2",
+        "dateAdded": "2021-12-10",
+        "requiredAction": "For all affected software assets for which updates exist, the only acceptable remediation actions are: 1) Apply updates; OR 2) remove affected assets from agency networks. Temporary mitigations using one of the measures provided at https://www.cisa.gov/uscert/ed-22-02-apache-log4j-recommended-mitigation-measures are only acceptable until updates are available.",
+        "dueDate": "2021-12-24"
+      },
+      "epss": {
+        "cve": "CVE-2021-44228",
+        "epss": 0.99999,
+        "percentile": 1,
+        "date": "2026-07-20"
+      },
+      "poc": {
+        "found": true,
+        "confidence": "medium",
+        "sources": [
+          {
+            "url": "https://www.exploit-db.com/exploits/51183",
+            "source": "exploitdb",
+            "reason": "Exploit-DB #51183: AD Manager Plus 7122 - Remote Code Execution (RCE)"
+          },
+          {
+            "url": "https://www.exploit-db.com/exploits/50592",
+            "source": "exploitdb",
+            "reason": "Exploit-DB #50592: Apache Log4j 2 - Remote Code Execution (RCE)"
+          },
+          {
+            "url": "https://www.exploit-db.com/exploits/50590",
+            "source": "exploitdb",
+            "reason": "Exploit-DB #50590: Apache Log4j2 2.14.1 - Information Disclosure"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edbtest-finding-002",
+      "tool": "trivy",
+      "category": "dependency-vulnerability",
+      "severity": "critical",
+      "title": "CVE-2017-5638: Apache Struts2 Remote Code Execution",
+      "description": "The Jakarta Multipart parser in Apache Struts 2 2.3.x before 2.3.32 and 2.5.x before 2.5.10.1 has incorrect exception handling and error-message generation during file-upload attempts, which allows remote attackers to execute arbitrary commands via crafted Content-Type, Content-Disposition, or Content-Length HTTP header values.",
+      "status": "open",
+      "identifiers": [
+        "CVE-2017-5638"
+      ],
+      "packageName": "org.apache.struts:struts2-core",
+      "packageVersion": "2.3.20",
+      "ecosystem": "maven",
+      "purl": "pkg:maven/org.apache.struts/struts2-core@2.3.20",
+      "fixedVersions": [
+        "2.3.32",
+        "2.5.10.1"
+      ],
+      "osv": {
+        "id": "CVE-2017-5638",
+        "aliases": [
+          "GHSA-j77q-2qqg-6989"
+        ],
+        "publishedAt": "2017-03-11T02:59:00.150Z",
+        "modifiedAt": "2026-07-08T05:50:03.837773344Z",
+        "references": [
+          {
+            "type": "WEB",
+            "url": "https://git1-us-west.apache.org/repos/asf?p=struts.git%3Ba=commit%3Bh=352306493971e7d5a756d61780d57a76eb1f519a"
+          },
+          {
+            "type": "WEB",
+            "url": "https://git1-us-west.apache.org/repos/asf?p=struts.git%3Ba=commit%3Bh=6b8272ce47160036ed120a48345d9aa884477228"
+          },
+          {
+            "type": "WEB",
+            "url": "https://h20566.www2.hpe.com/hpsc/doc/public/display?docLocale=en_US&docId=emr_na-hpesbgn03733en_us"
+          },
+          {
+            "type": "WEB",
+            "url": "https://www.cisa.gov/known-exploited-vulnerabilities-catalog?field_cve=CVE-2017-5638"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "http://www.arubanetworks.com/assets/alert/ARUBA-PSA-2017-002.txt"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "http://www.eweek.com/security/apache-struts-vulnerability-under-attack.html"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "http://www.securityfocus.com/bid/96729"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "http://www.securitytracker.com/id/1037973"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://cwiki.apache.org/confluence/display/WW/S2-045"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://cwiki.apache.org/confluence/display/WW/S2-046"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://h20566.www2.hpe.com/hpsc/doc/public/display?docLocale=en_US&docId=emr_na-hpesbgn03749en_us"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://h20566.www2.hpe.com/hpsc/doc/public/display?docLocale=en_US&docId=emr_na-hpesbhf03723en_us"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://security.netapp.com/advisory/ntap-20170310-0001/"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://struts.apache.org/docs/s2-045.html"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://struts.apache.org/docs/s2-046.html"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://support.lenovo.com/us/en/product_security/len-14200"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://twitter.com/theog150/status/841146956135124993"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://www.imperva.com/blog/2017/03/cve-2017-5638-new-remote-code-execution-rce-vulnerability-in-apache-struts-2/"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://www.kb.cert.org/vuls/id/834067"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://www.symantec.com/security-center/network-protection-security-advisories/SA145"
+          },
+          {
+            "type": "REPORT",
+            "url": "https://github.com/rapid7/metasploit-framework/issues/8064"
+          },
+          {
+            "type": "FIX",
+            "url": "http://www.oracle.com/technetwork/security-advisory/cpujul2017-3236622.html"
+          },
+          {
+            "type": "ARTICLE",
+            "url": "https://lists.apache.org/thread.html/r1125f3044a0946d1e7e6f125a6170b58d413ebd4a95157e4608041c7%40%3Cannounce.apache.org%3E"
+          },
+          {
+            "type": "ARTICLE",
+            "url": "https://lists.apache.org/thread.html/r6d03e45b81eab03580cf7f8bb51cb3e9a1b10a2cc0c6a2d3cc92ed0c%40%3Cannounce.apache.org%3E"
+          },
+          {
+            "type": "ARTICLE",
+            "url": "https://lists.apache.org/thread.html/r90890afea72a9571d666820b2fe5942a0a5f86be406fa31da3dd0922%40%3Cannounce.apache.org%3E"
+          },
+          {
+            "type": "EVIDENCE",
+            "url": "http://blog.talosintelligence.com/2017/03/apache-0-day-exploited.html"
+          },
+          {
+            "type": "EVIDENCE",
+            "url": "http://blog.trendmicro.com/trendlabs-security-intelligence/cve-2017-5638-apache-struts-vulnerability-remote-code-execution/"
+          },
+          {
+            "type": "EVIDENCE",
+            "url": "https://arstechnica.com/security/2017/03/critical-vulnerability-under-massive-attack-imperils-high-impact-sites/"
+          },
+          {
+            "type": "EVIDENCE",
+            "url": "https://exploit-db.com/exploits/41570"
+          },
+          {
+            "type": "EVIDENCE",
+            "url": "https://github.com/mazen160/struts-pwn"
+          },
+          {
+            "type": "EVIDENCE",
+            "url": "https://isc.sans.edu/diary/22169"
+          },
+          {
+            "type": "EVIDENCE",
+            "url": "https://nmap.org/nsedoc/scripts/http-vuln-cve2017-5638.html"
+          },
+          {
+            "type": "EVIDENCE",
+            "url": "https://packetstormsecurity.com/files/141494/S2-45-poc.py.txt"
+          },
+          {
+            "type": "EVIDENCE",
+            "url": "https://www.exploit-db.com/exploits/41614/"
+          }
+        ]
+      },
+      "kev": {
+        "cveId": "CVE-2017-5638",
+        "vendorProject": "Apache",
+        "product": "Struts",
+        "dateAdded": "2021-11-03",
+        "requiredAction": "Apply updates per vendor instructions.",
+        "dueDate": "2022-05-03"
+      },
+      "epss": {
+        "cve": "CVE-2017-5638",
+        "epss": 0.99999,
+        "percentile": 0.99994,
+        "date": "2026-07-20"
+      },
+      "poc": {
+        "found": true,
+        "confidence": "medium",
+        "sources": [
+          {
+            "url": "https://www.exploit-db.com/exploits/41570",
+            "source": "exploitdb",
+            "reason": "Exploit-DB #41570: Apache Struts 2.3.5 < 2.3.31 / 2.5 < 2.5.10 - Remote Code Execution (verified)"
+          },
+          {
+            "url": "https://www.exploit-db.com/exploits/41614",
+            "source": "exploitdb",
+            "reason": "Exploit-DB #41614: Apache Struts 2.3.5 < 2.3.31 / 2.5 < 2.5.10 - 'Jakarta' Multipart Parser OGNL Injection (Metasploit) (verified)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edbtest-finding-003",
+      "tool": "trivy",
+      "category": "dependency-vulnerability",
+      "severity": "high",
+      "title": "CVE-2022-22965: Spring Framework Remote Code Execution (Spring4Shell)",
+      "description": "A Spring MVC or Spring WebFlux application running on JDK 9+ may be vulnerable to remote code execution (RCE) via data binding.",
+      "status": "open",
+      "identifiers": [
+        "CVE-2022-22965"
+      ],
+      "packageName": "org.springframework:spring-webmvc",
+      "packageVersion": "5.3.17",
+      "ecosystem": "maven",
+      "purl": "pkg:maven/org.springframework/spring-webmvc@5.3.17",
+      "fixedVersions": [
+        "5.3.18",
+        "5.2.20"
+      ],
+      "osv": {
+        "id": "CVE-2022-22965",
+        "aliases": [
+          "GHSA-36p3-wjmg-h94x"
+        ],
+        "publishedAt": "2022-04-01T22:17:30Z",
+        "modifiedAt": "2026-07-15T01:49:01.459437294Z",
+        "references": [
+          {
+            "type": "WEB",
+            "url": "http://packetstormsecurity.com/files/166713/Spring4Shell-Code-Execution.html"
+          },
+          {
+            "type": "WEB",
+            "url": "http://packetstormsecurity.com/files/167011/Spring4Shell-Spring-Framework-Class-Property-Remote-Code-Execution.html"
+          },
+          {
+            "type": "WEB",
+            "url": "https://cert-portal.siemens.com/productcert/pdf/ssa-254054.pdf"
+          },
+          {
+            "type": "WEB",
+            "url": "https://psirt.global.sonicwall.com/vuln-detail/SNWLID-2022-0005"
+          },
+          {
+            "type": "WEB",
+            "url": "https://tanzu.vmware.com/security/cve-2022-22965"
+          },
+          {
+            "type": "WEB",
+            "url": "https://www.cisa.gov/known-exploited-vulnerabilities-catalog?field_cve=CVE-2022-22965"
+          },
+          {
+            "type": "WEB",
+            "url": "https://www.kb.cert.org/vuls/id/970766"
+          },
+          {
+            "type": "WEB",
+            "url": "https://www.oracle.com/security-alerts/cpuapr2022.html"
+          },
+          {
+            "type": "WEB",
+            "url": "https://www.oracle.com/security-alerts/cpujul2022.html"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://github.com/CVEProject/cvelistV5/tree/main/cves/2022/22xxx/CVE-2022-22965.json"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://nvd.nist.gov/vuln/detail/CVE-2022-22965"
+          },
+          {
+            "type": "ADVISORY",
+            "url": "https://tools.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-java-spring-rce-Zx9GUc67"
+          }
+        ]
+      },
+      "kev": {
+        "cveId": "CVE-2022-22965",
+        "vendorProject": "VMware",
+        "product": "Spring Framework",
+        "dateAdded": "2022-04-04",
+        "requiredAction": "Apply updates per vendor instructions.",
+        "dueDate": "2022-04-25"
+      },
+      "epss": {
+        "cve": "CVE-2022-22965",
+        "epss": 0.99677,
+        "percentile": 0.99949,
+        "date": "2026-07-20"
+      }
+    }
+  ]
+}

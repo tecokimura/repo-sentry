@@ -60,12 +60,16 @@ echo "exit: $?"
 ```text
 reports/
   MYAPP-main/
-    scan_myapp_A3F2260612.md       ← Markdown レポート
-    scan_myapp_A3F2260612.json     ← JSON（sentry-enrich の入力に使用）
-    scan_myapp_A3F2260612.sbom.cdx.json
+    scan_myapp_MYAP7C1A26061217.md       ← Markdown レポート
+    scan_myapp_MYAP7C1A26061217.json     ← JSON（sentry-enrich の入力に使用）
+    scan_myapp_MYAP7C1A26061217.sbom.cdx.json
 ```
 
 ファイル名の構成: `scan_{short}_{HASH}{YYMMDDHH}[_{suffix}].{ext}`
+
+- `short`: プロジェクト名の最初のセグメント（小文字・12 文字以内）
+- `HASH`: プロジェクト名の先頭 4 文字（英数大文字）+ sha256 末尾 4 桁（最大 8 文字）
+- `YYMMDDHH`: 日時（`DATE_FORMAT` / `REPORT_DATE` で変更・省略可能）
 
 ## 設定ファイル（.env）
 
@@ -109,7 +113,7 @@ OLLAMA_MODEL=qwen2.5:7b
 `docker-scan.sh` で生成した `scan_*.json` を、外部脆弱性データベースで補強します。
 
 ```bash
-./scripts/docker-enrich.sh reports/MYAPP-main/scan_myapp_A3F2260612.json
+./scripts/docker-enrich.sh reports/MYAPP-main/scan_myapp_MYAP7C1A26061217.json
 ```
 
 エンリッチ完了後、同じディレクトリに `enriched_*.json` が生成されます。
@@ -117,35 +121,35 @@ OLLAMA_MODEL=qwen2.5:7b
 ```text
 reports/
   MYAPP-main/
-    scan_myapp_A3F2260612.json
-    enriched_myapp_A3F2260612.json   ← 追加情報付き
+    scan_myapp_MYAP7C1A26061217.json
+    enriched_myapp_MYAP7C1A26061217.json   ← 追加情報付き
 ```
 
 ### 追加される情報
 
-| フィールド | ソース | 内容 |
-| --- | --- | --- |
-| `osv` | [OSV](https://osv.dev/) | 脆弱性詳細・aliases・summary |
-| `kev` | [CISA KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) | 実際に悪用されているか（dateAdded など） |
-| `epss` | [FIRST EPSS](https://www.first.org/epss/) | 今後悪用される可能性スコア（0.0〜1.0） |
-| `dependencyType` | SBOM | `direct` または `transitive`（SBOM 指定時のみ） |
-| `canonicalReference` | finding.id から生成 | CVE → AVD URL、GHSA → GitHub Advisory URL |
-| `invalidReferences` | URL 検証 | finding.id と一致しない URL を記録（report では非表示） |
+| フィールド           | ソース                                                                   | 内容                                                    |
+| -------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------- |
+| `osv`                | [OSV](https://osv.dev/)                                                  | 脆弱性詳細・aliases・summary                            |
+| `kev`                | [CISA KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) | 実際に悪用されているか（dateAdded など）                |
+| `epss`               | [FIRST EPSS](https://www.first.org/epss/)                                | 今後悪用される可能性スコア（0.0〜1.0）                  |
+| `dependencyType`     | SBOM                                                                     | `direct` または `transitive`（SBOM 指定時のみ）         |
+| `canonicalReference` | finding.id から生成                                                      | CVE → AVD URL、GHSA → GitHub Advisory URL               |
+| `invalidReferences`  | URL 検証                                                                 | finding.id と一致しない URL を記録（report では非表示） |
 
 ### docker-enrich.sh オプション
 
-| オプション | 説明 |
-| --- | --- |
-| `SCAN_JSON` | エンリッチ対象の `scan_*.json` ファイルパス（必須） |
-| `--output PATH` | 出力ファイルパス（省略時は入力と同じディレクトリ） |
-| `--sbom PATH` | CycloneDX SBOM（`direct`/`transitive` 判定用） |
+| オプション      | 説明                                                |
+| --------------- | --------------------------------------------------- |
+| `SCAN_JSON`     | エンリッチ対象の `scan_*.json` ファイルパス（必須） |
+| `--output PATH` | 出力ファイルパス（省略時は入力と同じディレクトリ）  |
+| `--sbom PATH`   | CycloneDX SBOM（`direct`/`transitive` 判定用）      |
 
-### sentry-enrich image の build
+### Docker image の build
 
-`docker-build.sh` はスキャン用と enrich 用の両方を build します。
+`docker-build.sh` は全ツールの image を一括で build します。
 
 ```bash
-./scripts/docker-build.sh   # 両方を build（scan + enrich）
+./scripts/docker-build.sh   # scan + enrich + report + export + watch
 ```
 
 個別に build する場合:
@@ -154,6 +158,8 @@ reports/
 ./scripts/docker-build-scan.sh    # repo-sentry-scan:local
 ./scripts/docker-build-enrich.sh  # repo-sentry-enrich:local
 ./scripts/docker-build-report.sh  # repo-sentry-report:local
+./scripts/docker-build-export.sh  # repo-sentry-export:local
+./scripts/docker-build-watch.sh   # repo-sentry-watch:local
 ```
 
 `--no-cache` オプションを付けると Docker キャッシュを使わずにビルドします。
@@ -181,7 +187,7 @@ REPORT_NAME=owner-name-security-scan \
 出力例:
 
 ```text
-reports/YYYYMMDD-HHMM_owner-name-security-scan.md
+reports/owner-name-security-scan/scan_owner-name-s_OWNE7C1A26071016.md
 ```
 
 Dependabot alerts API は、API 実行時に GitHub に新規スキャンをさせるものではありません。GitHub 側で
@@ -222,10 +228,10 @@ CLEARWING_PROVIDER=ollama   # Ollama を使用
 # 省略時: OPENAI_API_KEY が設定されていれば openai、なければ ollama
 ```
 
-| プロバイダー | 速度 | コスト | プライバシー | 推奨用途 |
-| --- | --- | --- | --- | --- |
-| OpenAI (`gpt-4o-mini`) | 速い | 約 1 円 / 25 件 | データ送信あり | 品質重視・社外プロジェクト |
-| Ollama (ローカル) | 遅い（CPU依存） | 無料 | データ送信なし | オフライン・社内プロジェクト |
+| プロバイダー           | 速度            | コスト          | プライバシー   | 推奨用途                     |
+| ---------------------- | --------------- | --------------- | -------------- | ---------------------------- |
+| OpenAI (`gpt-4o-mini`) | 速い            | 約 1 円 / 25 件 | データ送信あり | 品質重視・社外プロジェクト   |
+| Ollama (ローカル)      | 遅い（CPU依存） | 無料            | データ送信なし | オフライン・社内プロジェクト |
 
 ### パターン A: 通常スキャン（LLM なし）
 
@@ -251,6 +257,7 @@ OPENAI_API_KEY=sk-...
 ```
 
 OpenAI API キーの発行方法:
+
 1. [platform.openai.com/api-keys](https://platform.openai.com/api-keys) でキーを作成
 2. Permissions は `Restricted` → `Model capabilities: Write` のみで十分
 3. `Settings → Limits` で月の使用上限を設定しておくことを推奨（$5 で十分）
@@ -289,10 +296,10 @@ docker volume rm repo-sentry-ollama-models
 
 `docker-scan.sh` 自体は変更不要で、通常スキャンへの影響はありません。
 
-> **Mac ネイティブ Ollama への移行:** Ollama をホストに直接インストールして
-> `ollama serve` を起動している場合は、`docker-scan.sh` に `--clearwing-ack-risk` と
-> `--tools gitleaks,trivy,clearwing` を追加するだけでそのまま利用できます。
-> ホストの Ollama は `host.docker.internal:11434` で自動的に参照されます。
+> **Mac ネイティブ Ollama への移行:** Ollama をホストに直接インストールして `ollama serve`
+> を起動している場合は、`docker-scan.sh` に `--clearwing-ack-risk` と
+> `--tools gitleaks,trivy,clearwing` を追加するだけでそのまま利用できます。 ホストの Ollama は
+> `host.docker.internal:11434` で自動的に参照されます。
 
 ---
 
@@ -300,18 +307,19 @@ docker volume rm repo-sentry-ollama-models
 
 ### docker-scan.sh
 
-デフォルト動作（オプション省略時）: `gitleaks + trivy` でスキャン、Markdown レポートと CycloneDX SBOM を `reports/` に出力。
+デフォルト動作（オプション省略時）: `gitleaks + trivy` でスキャン、Markdown レポートと CycloneDX
+SBOM を `reports/` に出力。
 
-| オプション              | 対応する env 変数 | 既定値                    | 説明                                                      |
-| ----------------------- | ----------------- | ------------------------- | --------------------------------------------------------- |
-| `TARGET_DIR`            | `TARGET_PATH`     | カレントディレクトリ      | スキャン対象ディレクトリ                                  |
-| `--tools LIST`          | `TOOLS`           | `gitleaks,trivy`          | 実行する collector。カンマ区切り                          |
-| `--format FORMAT`       | `FORMAT`          | `markdown`                | 出力形式。`markdown` または `json`                        |
-| `--no-sbom`             | `SBOM=false`      | **SBOM 有効**             | 指定すると CycloneDX SBOM 生成をスキップ                  |
-| `--repo OWNER/NAME`     | `REPO`            | 未設定                    | GitHub repository。Dependabot 使用時に必須                |
-| `--report-name NAME`    | `REPORT_NAME`     | `repo-sentry-scan`        | レポートファイル名のプレフィックス                        |
-| `--fail-on=SEVERITY`    | —                 | `high`                    | 終了コード 1 の閾値。`critical/high/medium/low` を指定可  |
-| `--artifacts-dir=PATH`  | —                 | 未設定                    | raw scanner output (gitleaks/trivy JSON) の保存先         |
+| オプション             | 対応する env 変数 | 既定値               | 説明                                                     |
+| ---------------------- | ----------------- | -------------------- | -------------------------------------------------------- |
+| `TARGET_DIR`           | `TARGET_PATH`     | カレントディレクトリ | スキャン対象ディレクトリ                                 |
+| `--tools LIST`         | `TOOLS`           | `gitleaks,trivy`     | 実行する collector。カンマ区切り                         |
+| `--format FORMAT`      | `FORMAT`          | `markdown`           | 出力形式。`markdown` または `json`                       |
+| `--no-sbom`            | `SBOM=false`      | **SBOM 有効**        | 指定すると CycloneDX SBOM 生成をスキップ                 |
+| `--repo OWNER/NAME`    | `REPO`            | 未設定               | GitHub repository。Dependabot 使用時に必須               |
+| `--report-name NAME`   | `REPORT_NAME`     | `repo-sentry-scan`   | レポートファイル名のプレフィックス                       |
+| `--fail-on=SEVERITY`   | —                 | `high`               | 終了コード 1 の閾値。`critical/high/medium/low` を指定可 |
+| `--artifacts-dir=PATH` | —                 | 未設定               | raw scanner output (gitleaks/trivy JSON) の保存先        |
 
 `--fail-on` と `--artifacts-dir` は `--flag=value` 形式で repo-sentry CLI に直接転送されます。
 
@@ -336,26 +344,27 @@ docker volume rm repo-sentry-ollama-models
 
 ### docker-scan-clearwing.sh
 
-デフォルト動作: `gitleaks + trivy + clearwing` でスキャン、critical/high/medium を LLM 分析、Markdown レポートと SBOM を出力。
+デフォルト動作: `gitleaks + trivy + clearwing` でスキャン、critical/high/medium を LLM
+分析、Markdown レポートと SBOM を出力。
 
-| オプション                    | 既定値           | 説明                                                             |
-| ----------------------------- | ---------------- | ---------------------------------------------------------------- |
-| `TARGET_DIR`                  | カレントディレクトリ | スキャン対象ディレクトリ                               |
-| `--tools LIST`                | `gitleaks,trivy,clearwing` | 実行する collector                               |
-| `--format FORMAT`             | `markdown`       | 出力形式。`markdown` または `json`                               |
-| `--no-sbom`                   | **SBOM 有効**    | 指定すると SBOM 生成をスキップ                                   |
-| `--clearwing-depth=DEPTH`     | `standard`       | LLM 分析の対象範囲                                               |
-| `--repo OWNER/NAME`           | 未設定           | GitHub repository。Dependabot 使用時に必須                       |
-| `--fail-on=SEVERITY`          | `high`           | 終了コード 1 の閾値                                              |
-| `--debug`                     | オフ             | 診断ログを常時表示（エラー時は自動表示）                         |
+| オプション                | 既定値                     | 説明                                       |
+| ------------------------- | -------------------------- | ------------------------------------------ |
+| `TARGET_DIR`              | カレントディレクトリ       | スキャン対象ディレクトリ                   |
+| `--tools LIST`            | `gitleaks,trivy,clearwing` | 実行する collector                         |
+| `--format FORMAT`         | `markdown`                 | 出力形式。`markdown` または `json`         |
+| `--no-sbom`               | **SBOM 有効**              | 指定すると SBOM 生成をスキップ             |
+| `--clearwing-depth=DEPTH` | `standard`                 | LLM 分析の対象範囲                         |
+| `--repo OWNER/NAME`       | 未設定                     | GitHub repository。Dependabot 使用時に必須 |
+| `--fail-on=SEVERITY`      | `high`                     | 終了コード 1 の閾値                        |
+| `--debug`                 | オフ                       | 診断ログを常時表示（エラー時は自動表示）   |
 
 `--clearwing-depth` の値:
 
-| 値           | 分析対象                          |
-| ------------ | --------------------------------- |
-| `priority`   | critical / high のみ              |
-| `standard`   | critical / high / medium（既定）  |
-| `verbose`    | info / unknown を除くすべて       |
+| 値         | 分析対象                         |
+| ---------- | -------------------------------- |
+| `priority` | critical / high のみ             |
+| `standard` | critical / high / medium（既定） |
+| `verbose`  | info / unknown を除くすべて      |
 
 例:
 
@@ -377,27 +386,27 @@ docker volume rm repo-sentry-ollama-models
 
 CLI オプションは対応する環境変数より優先されます。環境変数でのみ設定できる項目:
 
-| 変数                | 既定値              | 説明                                            |
-| ------------------- | ------------------- | ----------------------------------------------- |
-| `REPO_SENTRY_IMAGE` | `repo-sentry:local` | 実行する Docker image                           |
-| `REPORTS_DIR`       | `./reports`         | レポート出力先                                  |
-| `CACHE_DIR`         | `./.repo-sentry`    | Deno / Trivy cache 保存先                       |
-| `REPORT_DATE`       | 実行日時            | レポートファイル名の日時部分（形式: YYYYMMDD-HHMM）|
-| `DOCKER_USER`       | `$(id -u):$(id -g)` | bind mount へ書き込むための Docker 実行ユーザー |
+| 変数                | 既定値              | 説明                                                |
+| ------------------- | ------------------- | --------------------------------------------------- |
+| `REPO_SENTRY_IMAGE` | `repo-sentry:local` | 実行する Docker image                               |
+| `REPORTS_DIR`       | `./reports`         | レポート出力先                                      |
+| `CACHE_DIR`         | `./.repo-sentry`    | Deno / Trivy cache 保存先                           |
+| `REPORT_DATE`       | 実行日時            | レポートファイル名の日時部分（形式: YYYYMMDD-HHMM） |
+| `DOCKER_USER`       | `$(id -u):$(id -g)` | bind mount へ書き込むための Docker 実行ユーザー     |
 
 ## Secret / API Key 変数
 
-secret は CLI 引数ではなく環境変数（または `.env` ファイル）で渡します。
-repo-sentry は token をレポート、ログ、エラー詳細に出さない方針です。
+secret は CLI 引数ではなく環境変数（または `.env` ファイル）で渡します。 repo-sentry は token
+をレポート、ログ、エラー詳細に出さない方針です。
 
-| 変数                  | 用途                                                           | 必須になる条件                  |
-| --------------------- | -------------------------------------------------------------- | ------------------------------- |
-| `GITHUB_TOKEN`        | GitHub API から repository 情報と Dependabot alerts を取得する | `dependabot` 使用時             |
-| `SLACK_WEBHOOK_URL`   | Slack 通知用                                                   | Slack reporter 実装後           |
-| `CLEARWING_PROVIDER`  | Clearwing のプロバイダー指定（`openai` または `ollama`）       | 省略時は自動判定                |
-| `OPENAI_API_KEY`      | OpenAI API キー                                                | `CLEARWING_PROVIDER=openai` 時  |
-| `OPENAI_MODEL`        | 使用する OpenAI モデル（既定値: `gpt-4o-mini`）                | 任意                            |
-| `OLLAMA_MODEL`        | 使用する Ollama モデル（推奨: `qwen2.5:7b`）                   | `CLEARWING_PROVIDER=ollama` 時  |
+| 変数                 | 用途                                                           | 必須になる条件                 |
+| -------------------- | -------------------------------------------------------------- | ------------------------------ |
+| `GITHUB_TOKEN`       | GitHub API から repository 情報と Dependabot alerts を取得する | `dependabot` 使用時            |
+| `SLACK_WEBHOOK_URL`  | Slack 通知用                                                   | sentry-watch で変化あり検出時  |
+| `CLEARWING_PROVIDER` | Clearwing のプロバイダー指定（`openai` または `ollama`）       | 省略時は自動判定               |
+| `OPENAI_API_KEY`     | OpenAI API キー                                                | `CLEARWING_PROVIDER=openai` 時 |
+| `OPENAI_MODEL`       | 使用する OpenAI モデル（既定値: `gpt-4o-mini`）                | 任意                           |
+| `OLLAMA_MODEL`       | 使用する Ollama モデル（推奨: `qwen2.5:7b`）                   | `CLEARWING_PROVIDER=ollama` 時 |
 
 `gitleaks` と `trivy` のみ使用する場合、`GITHUB_TOKEN` は不要です。
 
@@ -448,12 +457,12 @@ Compose の既定コマンドは、カレントリポジトリを read-only で 
 
 Compose で使う主な変数:
 
-| 変数                | 説明                           |
-| ------------------- | ------------------------------ |
-| `LOCAL_UID`         | コンテナ実行ユーザーの UID     |
-| `LOCAL_GID`         | コンテナ実行ユーザーの GID     |
-| `GITHUB_TOKEN`      | Dependabot alerts API 用       |
-| `SLACK_WEBHOOK_URL` | Slack 通知用。現時点では未実装 |
+| 変数                | 説明                            |
+| ------------------- | ------------------------------- |
+| `LOCAL_UID`         | コンテナ実行ユーザーの UID      |
+| `LOCAL_GID`         | コンテナ実行ユーザーの GID      |
+| `GITHUB_TOKEN`      | Dependabot alerts API 用        |
+| `SLACK_WEBHOOK_URL` | sentry-watch Slack 通知用       |
 | `OPENAI_API_KEY`    | Clearwing OpenAI プロバイダー用 |
 
 ## CLI の直接実行
@@ -546,10 +555,11 @@ JSON レポートは次のような形です。
 
 ## sentry-report: AI レポート生成（Phase 3）
 
-`docker-enrich.sh` で生成した `enriched_*.json` をもとに、AI が分析して Markdown レポートを生成します。
+`docker-enrich.sh` で生成した `enriched_*.json` をもとに、AI が分析して Markdown
+レポートを生成します。
 
 ```bash
-./scripts/docker-report.sh reports/MYAPP-main/enriched_myapp_A3F2260612.json
+./scripts/docker-report.sh reports/MYAPP-main/enriched_myapp_MYAP7C1A26061217.json
 ```
 
 生成ファイル:
@@ -557,8 +567,8 @@ JSON レポートは次のような形です。
 ```text
 reports/
   MYAPP-main/
-    report_myapp_A3F2260612-plan.json   ← AI が生成した ReportPlan（監査用）
-    report_myapp_A3F2260612.md          ← Markdown レポート
+    report_myapp_MYAP7C1A26061217-plan.json   ← AI が生成した ReportPlan（監査用）
+    report_myapp_MYAP7C1A26061217.md          ← Markdown レポート
 ```
 
 `--debug` を付けると `report-input.json`（変換後の中間データ）も保存されます。
@@ -577,20 +587,22 @@ REPORT_LLM_MODEL=qwen2.5:7b \
 ./scripts/docker-report.sh enriched.json
 ```
 
-| 環境変数 | 既定値 | 説明 |
-| --- | --- | --- |
-| `REPORT_LLM_PROVIDER` | 自動判定 | `openai` または `ollama`（`CLEARWING_PROVIDER` でも可） |
-| `OPENAI_API_KEY` | — | OpenAI API キー |
-| `REPORT_LLM_MODEL` | `qwen2.5:7b` / `gpt-4o-mini` | LLM モデル名（`OLLAMA_MODEL` でも可） |
-| `OLLAMA_BASE_URL` | `http://host.docker.internal:11434` | Ollama ホスト（`OLLAMA_HOST` でも可） |
+| 環境変数              | 既定値                              | 説明                                                    |
+| --------------------- | ----------------------------------- | ------------------------------------------------------- |
+| `REPORT_LLM_PROVIDER` | 自動判定                            | `openai` または `ollama`（`CLEARWING_PROVIDER` でも可） |
+| `OPENAI_API_KEY`      | —                                   | OpenAI API キー                                         |
+| `REPORT_LLM_MODEL`    | `qwen2.5:7b` / `gpt-4o-mini`        | LLM モデル名（`OLLAMA_MODEL` でも可）                   |
+| `OLLAMA_BASE_URL`     | `http://host.docker.internal:11434` | Ollama ホスト（`OLLAMA_HOST` でも可）                   |
 
 ### AI の責務分離
 
 AI（`ReportPlan`）が担当する内容:
+
 - 総評（executiveSummary）・全体リスク評価
 - 各 finding の対応理由・後回し理由
 
 Renderer（`ReportInput` から直接）が担当する内容:
+
 - CVE ID・パッケージ名・バージョン・修正コマンド
 - EPSS スコア・KEV 情報・CWE
 - 付録の全 Finding 一覧
@@ -599,13 +611,201 @@ Renderer（`ReportInput` から直接）が担当する内容:
 
 ### docker-report.sh オプション
 
-| オプション | 説明 |
-| --- | --- |
-| `ENRICHED_JSON` | 対象の `enriched_*.json` ファイルパス（必須） |
-| `--output PATH` | `report.md` の出力パス（省略時は入力と同ディレクトリに自動生成） |
-| `--plan-output PATH` | `report-plan.json` の出力パス |
-| `--plan-input PATH` | 既存の `report-plan.json` を再利用（AI 呼び出しをスキップ） |
-| `--debug` | `report-input.json` も保存（デバッグ用） |
+| オプション           | 説明                                                             |
+| -------------------- | ---------------------------------------------------------------- |
+| `ENRICHED_JSON`      | 対象の `enriched_*.json` ファイルパス（必須）                    |
+| `--output PATH`      | `report.md` の出力パス（省略時は入力と同ディレクトリに自動生成） |
+| `--plan-output PATH` | `report-plan.json` の出力パス                                    |
+| `--plan-input PATH`  | 既存の `report-plan.json` を再利用（AI 呼び出しをスキップ）      |
+| `--debug`            | `report-input.json` も保存（デバッグ用）                         |
+
+---
+
+## docker-run.sh: 一括実行（scan → enrich → report）
+
+3 ステップを一コマンドで実行します。stdout には最終レポートのファイルパスのみが出力されるため、
+シェルスクリプトやパイプラインから扱いやすくなっています。進捗・警告は stderr と
+`logs/{プロジェクト名}/run_YYMMDD-HHMM.log` に出力されます。
+
+```bash
+./scripts/docker-run.sh /path/to/target-repo
+# stdout: reports/target-repo/report_target_XXXX26071016.md
+```
+
+| オプション           | 既定値           | 説明                      |
+| -------------------- | ---------------- | ------------------------- |
+| `TARGET_DIR`         | 必須             | スキャン対象ディレクトリ  |
+| `--report-name NAME` | ディレクトリ名   | レポート名プレフィックス  |
+| `--tools LIST`       | `gitleaks,trivy` | scan で実行する collector |
+
+SBOM が生成されていれば enrich に自動で渡されます（direct/transitive 判定に使用）。 scan
+の終了コードが `0`（finding なし）または `1`（finding あり）の場合は後続へ進み、 `2`
+以上（エラー）の場合は中断します。
+
+環境変数 `REPORTS_DIR` / `DATE_FORMAT` / `REPORT_DATE` で出力先とファイル名の日時部分を
+制御できます（`DATE_FORMAT`: `none` / `date` / `datetime` / `hour`）。
+
+---
+
+## sentry-export: PDF 生成
+
+`docker-report.sh` で生成した `report_*.md` を PDF
+に変換します。配布・アーカイブ用途を想定しています。
+
+```bash
+./scripts/docker-export.sh reports/MYAPP-main/report_myapp_MYAP7C1A26061217.md
+```
+
+省略時は入力と同じディレクトリに `report_myapp_MYAP7C1A26061217.pdf` が生成されます。
+
+| オプション      | 説明                                            |
+| --------------- | ----------------------------------------------- |
+| `REPORT_MD`     | 変換対象の `report_*.md` ファイルパス（必須）   |
+| `--output PATH` | 出力 PDF パス（省略時は入力と同じディレクトリ） |
+
+image は `./scripts/docker-build-export.sh` で build します（`repo-sentry-export:local`）。
+
+---
+
+## sentry-watch: 継続監視
+
+### 目的・利用用途
+
+一度スキャンしたリポジトリについて、外部脆弱性 DB（KEV / EPSS / OSV）の変化を定期的に検出します。
+trivy による再スキャンは行わず、既存の `scan_*.json` を sentry-enrich で再エンリッチし、
+前回の結果と比較して差分レポートを生成します。対象リポジトリへのアクセスは不要です。
+
+**どんな問題を解決するか:**
+
+脆弱性の危険度は時間とともに変化します。
+
+- 先週は「低リスク」だった CVE が、今週 CISA KEV（実悪用確認済み）に登録されることがある
+- EPSS スコア（悪用確率）が急上昇し、即時対応が必要になることがある
+- 毎週手動で全 CVE を確認するコストは高い
+
+sentry-watch はこれらの変化を自動で検出し「前回から何が変わったか」だけをレポートします。
+
+### 利用パターン
+
+#### パターン 1: 初回実行
+
+`watch/watch-enrich_*.json` が存在しない場合、元の `enriched_*.json` を起点として比較します。
+
+```bash
+bash scripts/docker-watch.sh \
+  reports/MYAPP-main/scan_myapp_MYAP7C1A26061217.json \
+  reports/MYAPP-main/enriched_myapp_MYAP7C1A26061217.json
+```
+
+実行後に `watch/watch-enrich_*.json` が生成され、次回から自動切り替えが有効になります。
+
+#### パターン 2: 継続監視（毎週・定期実行）
+
+**2回目以降は同じコマンドを繰り返すだけです。**
+
+`watch/watch-enrich_*.json` が存在する場合、前回の再エンリッチ結果を baseline
+として自動的に使用します。
+「今回と前回の差分」だけが出力されるため、既知の変化が毎回再通知されません。
+
+```bash
+# 毎週同じコマンドを実行する（GitHub Actions schedule trigger などで自動化可能）
+bash scripts/docker-watch.sh \
+  reports/MYAPP-main/scan_myapp_MYAP7C1A26061217.json \
+  reports/MYAPP-main/enriched_myapp_MYAP7C1A26061217.json
+```
+
+#### パターン 3: スキャン原点にリセット（監査・棚卸し時）
+
+「初回スキャン以来の全変化を一覧したい」場合は `watch-enrich_*.json` を削除してから実行します。
+
+```bash
+# watch-enrich を削除 → 次回実行時に元の enriched_*.json が baseline に戻る
+rm reports/MYAPP-main/watch/watch-enrich_myapp_MYAP7C1A.json
+bash scripts/docker-watch.sh \
+  reports/MYAPP-main/scan_myapp_MYAP7C1A26061217.json \
+  reports/MYAPP-main/enriched_myapp_MYAP7C1A26061217.json
+```
+
+### baseline 自動切り替えの仕組み
+
+```
+初回:    enriched_*.json ──────────────── diff ◄── 今回の再エンリッチ
+                                                           ↓ 成功時に保存
+                                                  watch-enrich_*.json
+
+2回目:   watch-enrich_*.json（前回）──── diff ◄── 今回の再エンリッチ
+                                                           ↓ 成功時に更新
+                                                  watch-enrich_*.json
+
+3回目以降: 同様に前回の watch-enrich を baseline として使用
+```
+
+差分検出が**成功した場合のみ** `watch-enrich_*.json` を更新します。
+エンリッチ失敗・比較エラー時は前回の状態が保持されます。
+
+### 出力ファイル
+
+```text
+reports/
+  MYAPP-main/
+    scan_myapp_MYAP7C1A26061217.json
+    enriched_myapp_MYAP7C1A26061217.json
+    watch/
+      watch-enrich_myapp_MYAP7C1A.json    ← 最新の再エンリッチ（次回の baseline）
+      watch-diff_MYAP7C1A_260713.json     ← 差分データ（機械可読）
+      watch-report_MYAP7C1A_260713.md     ← 差分レポート（人間向け）
+```
+
+### 検出できる変化
+
+| 変化種別           | 内容                                                 |
+| ------------------ | ---------------------------------------------------- |
+| `kev_added`        | CISA KEV（既知悪用脆弱性カタログ）に新規登録された   |
+| `urgency_upgraded` | urgency が上昇した（deferred → planned → immediate） |
+| `epss_risen`       | EPSS が 0.05 以上上昇、または 0.4 閾値をまたいだ     |
+| `osv_updated`      | OSV の `modifiedAt` が更新された                     |
+| `new_finding`      | ベースラインにない finding が新たに検出された        |
+| `removed_finding`  | ベースラインにあった finding が消滅した              |
+
+### オプション
+
+| オプション               | 説明                                                     |
+| ------------------------ | -------------------------------------------------------- |
+| `BASELINE_SCAN_JSON`     | ベーススキャンの `scan_*.json` ファイルパス（必須）      |
+| `BASELINE_ENRICHED_JSON` | 初回比較の起点となる `enriched_*.json` パス（必須）      |
+| `--output-dir DIR`       | 出力先ディレクトリ（省略時は `watch/` サブディレクトリ） |
+
+環境変数:
+
+| 変数                | 説明                                                           |
+| ------------------- | -------------------------------------------------------------- |
+| `REPORTS_DIR`       | reports ルートディレクトリ（デフォルト: 入力ファイルの親の親） |
+| `GITHUB_TOKEN`      | エンリッチ時の PoC 検索に使用（任意）                          |
+| `SLACK_WEBHOOK_URL` | Slack 通知用 Webhook URL（任意）。未設定時は通知しない         |
+
+**Slack 通知:** `SLACK_WEBHOOK_URL`
+が設定され、かつ変化あり（`summary.changed > 0`）の場合のみ通知します。変化なしのときは送信しません。通知失敗は警告ログを出力するのみで
+watch の終了コードに影響しません。
+
+```bash
+# .env に設定するか、シェル変数として渡す
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/xxx/yyy/zzz \
+  ./scripts/docker-watch.sh scan_*.json enriched_*.json
+```
+
+image は `./scripts/docker-build-watch.sh` で build します（`repo-sentry-watch:local`）。
+
+### fixture を使った動作確認
+
+```bash
+deno run --allow-read --allow-write src/sentry-watch/cli.ts \
+  fixtures/watch-test/enriched_baseline.json \
+  fixtures/watch-test/enriched_changed.json \
+  --output-dir fixtures/watch-test/
+```
+
+`fixtures/watch-test/` には全 changeType を網羅した合成テストデータが含まれています（`deno test` の
+`watcher.test.ts` でも使用）。
 
 ---
 
@@ -660,9 +860,9 @@ Docker Hub からの `ollama/ollama` イメージ取得に時間がかかって�
 **Clearwing の LLM 分析が遅い / 時間がかかりすぎる**
 
 Ollama 使用時、Mac の Docker は Apple Silicon GPU（Metal）が使えないため CPU のみで推論します。
-`qwen2.5:7b` で通常 20〜60 秒 / finding 程度です。
-`standard` モード（既定）では critical / high / medium を分析するため、medium の件数が多いと
-時間がかかります。`--clearwing-depth=priority` で critical / high のみに絞れます。
+`qwen2.5:7b` で通常 20〜60 秒 / finding 程度です。 `standard` モード（既定）では critical / high /
+medium を分析するため、medium の件数が多いと 時間がかかります。`--clearwing-depth=priority` で
+critical / high のみに絞れます。
 
 ```bash
 ./scripts/docker-scan-clearwing.sh /path/to/target-repo --clearwing-depth=priority
@@ -693,7 +893,7 @@ Ollama 使用時、Mac の Docker は Apple Silicon GPU（Metal）が使えな�
 - SBOM による direct/transitive 判定
 - 参考 URL 検証（canonicalReference 生成・不正 URL 分離）
 
-**sentry-report（Phase 3）**: 初期安定版完了
+**sentry-report（Phase 3）**: Stable（実案件検証済み）
 
 - ReportInput スキーマ・priorityScore 自動計算
 - AI による ReportPlan 生成（OpenAI / Ollama）
@@ -703,14 +903,57 @@ Ollama 使用時、Mac の Docker は Apple Silicon GPU（Metal）が使えな�
 - エグゼクティブサマリー事実検証（AI テキスト矛盾検出・フォールバック）
 - canonicalReference 優先の参考 URL 表示
 
+**sentry-export（PDF 生成）**: 動作確認済み
+
+- report_*.md → PDF 変換（docker-export.sh）
+- サマリー表・修正ガイド・優先度別の色分け
+
+**docker-run.sh（一括実行）**: 完了
+
+- scan → enrich → report の一括実行・SBOM 自動パススルー
+- stdout にレポートパスのみ出力（パイプライン接続対応）・logs/ へのログ保存
+
+**sentry-watch（MVP）**: 完了
+
+- enrich 再実行 + 差分検出（KEV 新規登録 / urgency 上昇 / EPSS 上昇 / OSV 更新）
+- new_finding / removed_finding 検出
+- watch-diff.json / watch-report.md 生成
+- Docker 実行環境（Dockerfile.watch + docker-watch.sh）
+- fixture テスト（fixtures/watch-test/ + watcher.test.ts）
+
+**GitHub Actions（P3-6）**: 完了（2026-07-11）
+
+- `workflow_dispatch` による手動実行（対象リポジトリを入力）
+- scan → enrich → report → PDF の一括実行
+- Artifacts（zip）への成果物保存
+- ワークフロー: `.github/workflows/security-scan.yml`
+
+**sentry-watch baseline 自動切り替え**: 完了（2026-07-13）
+
+- 前回の `watch-enrich_*.json` を次回 baseline として自動使用
+- 削除すれば元の `enriched_*.json` に戻る（リセット）
+
+**sentry-watch Slack 通知**: 完了（2026-07-13）
+
+- `SLACK_WEBHOOK_URL` 設定時のみ通知（オプション）
+- 変化あり時のみ送信、失敗しても exit code に影響しない
+
+**sentry-enrich Exploit-DB 連携**: 完了（2026-07-14）
+
+- Exploit-DB の公開 CSV をローカルキャッシュして CVE に対応する PoC を検索（7 日 TTL）
+- トークン不要・GitHub Search の前段として実行
+
+**GitHub Actions 定期 watch（security-watch.yml）**: 実装済み
+
+- 毎週月曜 09:00 JST に対象リポジトリを再スキャンし、前回との差分を検出
+- 変化があり `SLACK_WEBHOOK_URL` secret が設定されていれば Slack に通知
+- 前回状態（baseline）は actions/cache で引き継ぎ。LLM 不要（OPENAI_API_KEY 不使用）
+- `workflow_dispatch` で手動実行も可能
+
 未実装または後続予定:
 
-- ExploitDB 連携
-- sentry-export（PDF 生成）
-- Slack reporter
 - TruffleHog collector
 - 複数 repository の一括実行
-- GitHub Actions workflow
 
 詳細な設計方針は [docs/tool-recommendations.md](docs/tool-recommendations.md) を参照してください。
 
@@ -718,7 +961,7 @@ Ollama 使用時、Mac の Docker は Apple Silicon GPU（Metal）が使えな�
 
 ```bash
 deno fmt
-deno check src/sentry-scan/cli.ts src/sentry-enrich/cli.ts
+deno check src/sentry-scan/cli.ts src/sentry-enrich/cli.ts src/sentry-report/cli.ts src/sentry-watch/cli.ts
 deno lint
 deno test
 ```

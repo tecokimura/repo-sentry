@@ -1,0 +1,27 @@
+ARG DENO_VERSION=2.5.6
+
+FROM denoland/deno:${DENO_VERSION}
+
+WORKDIR /app
+
+COPY deno.json README.md ./
+COPY src/ ./src/
+
+RUN deno cache src/sentry-watch/cli.ts
+
+RUN mkdir -p /workspace/reports /workspace/.repo-sentry \
+  && chown -R deno:deno /workspace /app
+
+ENV DENO_DIR=/workspace/.repo-sentry/deno-cache
+
+WORKDIR /workspace
+USER deno
+
+ENTRYPOINT ["deno", "run", \
+  "--allow-read=/app,/workspace", \
+  "--allow-write=/workspace/reports,/workspace/.repo-sentry", \
+  "--allow-env=DENO_DIR,SLACK_WEBHOOK_URL", \
+  "--allow-net=hooks.slack.com", \
+  "/app/src/sentry-watch/cli.ts"]
+
+CMD ["--help"]

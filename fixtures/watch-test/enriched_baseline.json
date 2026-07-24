@@ -1,0 +1,91 @@
+{
+  "scanId": "SCAN0001",
+  "enrichId": "ENRI0001",
+  "profile": "fixture",
+  "scannedAt": "2025-12-01T00:00:00.000Z",
+  "enrichedAt": "2025-12-01T00:10:00.000Z",
+  "summary": { "critical": 0, "high": 1, "medium": 2, "low": 3, "info": 0, "unknown": 0 },
+  "collectorStatuses": [
+    {
+      "tool": "trivy",
+      "status": "completed",
+      "startedAt": "2025-12-01T00:00:00.000Z",
+      "finishedAt": "2025-12-01T00:01:00.000Z",
+      "durationMs": 60000,
+      "findingsCount": 6,
+      "notes": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "CVE-2999-1001",
+      "tool": "trivy",
+      "category": "dependency-vulnerability",
+      "severity": "high",
+      "title": "Prototype pollution in alpha-utils",
+      "status": "open",
+      "packageName": "alpha-utils",
+      "packageVersion": "1.2.3",
+      "epss": { "cve": "CVE-2999-1001", "epss": 0.15, "percentile": 0.72, "date": "2025-12-01" }
+    },
+    {
+      "id": "CVE-2999-1002",
+      "tool": "trivy",
+      "category": "dependency-vulnerability",
+      "severity": "low",
+      "title": "Denial of service in alpha-utils",
+      "status": "open",
+      "packageName": "alpha-utils",
+      "packageVersion": "1.2.3",
+      "epss": { "cve": "CVE-2999-1002", "epss": 0.10, "percentile": 0.45, "date": "2025-12-01" }
+    },
+    {
+      "id": "CVE-2999-1003",
+      "tool": "trivy",
+      "category": "dependency-vulnerability",
+      "severity": "medium",
+      "title": "Path traversal in beta-parser",
+      "status": "open",
+      "packageName": "beta-parser",
+      "packageVersion": "0.9.1",
+      "epss": { "cve": "CVE-2999-1003", "epss": 0.39, "percentile": 0.88, "date": "2025-12-01" }
+    },
+    {
+      "id": "CVE-2999-1004",
+      "tool": "trivy",
+      "category": "dependency-vulnerability",
+      "severity": "low",
+      "title": "Information disclosure in gamma-codec",
+      "status": "open",
+      "packageName": "gamma-codec",
+      "packageVersion": "3.0.0",
+      "osv": {
+        "id": "CVE-2999-1004",
+        "summary": "Information disclosure",
+        "publishedAt": "2024-01-01T00:00:00.000Z",
+        "modifiedAt": "2024-01-15T00:00:00.000Z"
+      }
+    },
+    {
+      "id": "CVE-2999-1006",
+      "tool": "trivy",
+      "category": "dependency-vulnerability",
+      "severity": "low",
+      "title": "Buffer overflow in delta-client (legacy)",
+      "status": "open",
+      "packageName": "delta-client",
+      "packageVersion": "2.1.0"
+    },
+    {
+      "id": "CVE-2999-1007",
+      "tool": "trivy",
+      "category": "dependency-vulnerability",
+      "severity": "medium",
+      "title": "Command injection in gamma-codec",
+      "status": "open",
+      "packageName": "gamma-codec",
+      "packageVersion": "3.0.0",
+      "epss": { "cve": "CVE-2999-1007", "epss": 0.05, "percentile": 0.30, "date": "2025-12-01" }
+    }
+  ]
+}

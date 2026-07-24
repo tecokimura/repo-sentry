@@ -32,24 +32,25 @@ function parseArgs(args: string[]): ReportRequest {
     const next = () => args[++i];
     const val = (prefix: string) => arg.slice(prefix.length);
 
-    if (arg === "--input" || arg === "-i")           { req.input = next(); }
-    else if (arg.startsWith("--input="))             { req.input = val("--input="); }
-    else if (arg === "--plan-input")                  { req.planInput = next(); }
-    else if (arg.startsWith("--plan-input="))        { req.planInput = val("--plan-input="); }
-    else if (arg === "--output" || arg === "-o")      { req.reportOutput = next(); }
-    else if (arg.startsWith("--output="))            { req.reportOutput = val("--output="); }
-    else if (arg === "--plan-output")                 { req.planOutput = next(); }
-    else if (arg.startsWith("--plan-output="))       { req.planOutput = val("--plan-output="); }
-    else if (arg === "--debug-input")                 { req.debugInputOutput = next(); }
-    else if (arg.startsWith("--debug-input="))       { req.debugInputOutput = val("--debug-input="); }
-    else if (arg === "--provider")                    { req.planner.provider = next() as "openai" | "ollama"; }
-    else if (arg.startsWith("--provider="))          { req.planner.provider = val("--provider=") as "openai" | "ollama"; }
-    else if (arg === "--ollama-host")                 { req.planner.ollamaHost = next(); }
-    else if (arg.startsWith("--ollama-host="))       { req.planner.ollamaHost = val("--ollama-host="); }
-    else if (arg === "--ollama-model")                { req.planner.ollamaModel = next(); }
-    else if (arg.startsWith("--ollama-model="))      { req.planner.ollamaModel = val("--ollama-model="); }
-    else if (arg === "--openai-model")               { req.planner.openaiModel = next(); }
-    else if (arg.startsWith("--openai-model="))     { req.planner.openaiModel = val("--openai-model="); }
+    if (arg === "--input" || arg === "-i") req.input = next();
+    else if (arg.startsWith("--input=")) req.input = val("--input=");
+    else if (arg === "--plan-input") req.planInput = next();
+    else if (arg.startsWith("--plan-input=")) req.planInput = val("--plan-input=");
+    else if (arg === "--output" || arg === "-o") req.reportOutput = next();
+    else if (arg.startsWith("--output=")) req.reportOutput = val("--output=");
+    else if (arg === "--plan-output") req.planOutput = next();
+    else if (arg.startsWith("--plan-output=")) req.planOutput = val("--plan-output=");
+    else if (arg === "--debug-input") req.debugInputOutput = next();
+    else if (arg.startsWith("--debug-input=")) req.debugInputOutput = val("--debug-input=");
+    else if (arg === "--provider") req.planner.provider = next() as "openai" | "ollama";
+    else if (arg.startsWith("--provider=")) {
+      req.planner.provider = val("--provider=") as "openai" | "ollama";
+    } else if (arg === "--ollama-host") req.planner.ollamaHost = next();
+    else if (arg.startsWith("--ollama-host=")) req.planner.ollamaHost = val("--ollama-host=");
+    else if (arg === "--ollama-model") req.planner.ollamaModel = next();
+    else if (arg.startsWith("--ollama-model=")) req.planner.ollamaModel = val("--ollama-model=");
+    else if (arg === "--openai-model") req.planner.openaiModel = next();
+    else if (arg.startsWith("--openai-model=")) req.planner.openaiModel = val("--openai-model=");
   }
 
   req.planner.openaiApiKey = Deno.env.get("OPENAI_API_KEY");

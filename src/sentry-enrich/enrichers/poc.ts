@@ -1,12 +1,64 @@
-import type { EnrichedFinding, PocInfo, PocSource } from "../types.ts";
+import type { EnrichedFinding, PocConfidence, PocInfo, PocSource } from "../types.ts";
+import { searchExploitDb } from "./exploitdb.ts";
 
 const GITHUB_SEARCH_API = "https://api.github.com/search/repositories";
 
 // 1リクエストあたりの待機時間（ms）。未認証: 6000ms, 認証済み: 2000ms
 const RATE_LIMIT_DELAY_MS = 2100;
 
+const CONFIDENCE_RANK: Record<PocConfidence, number> = { low: 0, medium: 1, high: 2 };
+
+/** 既存の confidence を下げないよう、高い方を採用する */
+export function maxConfidence(a: PocConfidence, b: PocConfidence): PocConfidence {
+  return CONFIDENCE_RANK[a] >= CONFIDENCE_RANK[b] ? a : b;
+}
+
 export interface PocEnrichConfig {
   githubToken?: string;
+  cacheDir?: string;
+}
+
+/**
+ * Exploit-DB CSV をキャッシュ検索して PoC を付与する。
+ * トークン不要・ローカル検索のためレート制限なし。
+ * CVE ID がない finding はスキップ。
+ */
+export async function enrichWithExploitDbPoc(
+  findings: EnrichedFinding[],
+  config: { cacheDir: string },
+): Promise<EnrichedFinding[]> {
+  const results: EnrichedFinding[] = [];
+
+  for (const f of findings) {
+    const cveId = findCveId(f.identifiers);
+    if (!cveId) {
+      results.push(f);
+      continue;
+    }
+
+    const entries = await searchExploitDb(cveId, config.cacheDir);
+    if (entries.length === 0) {
+      results.push(f);
+      continue;
+    }
+
+    const newSources: PocSource[] = entries.map((e) => ({
+      url: e.url,
+      source: "exploitdb" as const,
+      reason: `Exploit-DB #${e.id}: ${e.description}${e.verified ? " (verified)" : ""}`,
+    }));
+
+    const existing = f.poc;
+    const merged: PocInfo = {
+      found: true,
+      // OSV 由来で high が付いている場合に medium へ降格させない
+      confidence: maxConfidence(existing?.confidence ?? "low", "medium"),
+      sources: [...(existing?.sources ?? []), ...newSources],
+    };
+    results.push({ ...f, poc: merged });
+  }
+
+  return results;
 }
 
 /**

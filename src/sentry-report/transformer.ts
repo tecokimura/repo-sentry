@@ -9,6 +9,7 @@ import type {
 } from "./types.ts";
 import { REPORT_INPUT_VERSION } from "./types.ts";
 import { computeRecommendedVersion } from "./semver.ts";
+import { deriveUrgency } from "../shared/urgency.ts";
 
 export function buildReportInput(report: EnrichedReport): ReportInput {
   const findings = report.findings.map(toReportFinding);
@@ -21,9 +22,7 @@ export function buildReportInput(report: EnrichedReport): ReportInput {
     repository: report.repository,
     scannedAt: report.scannedAt,
     summary: buildSummary(findings),
-    findings: findings.sort((a, b) =>
-      b.riskSignals.priorityScore - a.riskSignals.priorityScore
-    ),
+    findings: findings.sort((a, b) => b.riskSignals.priorityScore - a.riskSignals.priorityScore),
   };
 }
 
@@ -63,16 +62,24 @@ function computePriorityScore(f: EnrichedFinding): number {
   let score = 0;
 
   switch (f.severity) {
-    case "critical": score += 40; break;
-    case "high":     score += 25; break;
-    case "medium":   score += 15; break;
-    case "low":      score += 5;  break;
+    case "critical":
+      score += 40;
+      break;
+    case "high":
+      score += 25;
+      break;
+    case "medium":
+      score += 15;
+      break;
+    case "low":
+      score += 5;
+      break;
   }
 
   if (f.kev) score += 40;
 
   const epss = f.epss?.epss ?? 0;
-  if (epss >= 0.9)      score += 20;
+  if (epss >= 0.9) score += 20;
   else if (epss >= 0.7) score += 10;
   else if (epss >= 0.4) score += 5;
 
@@ -105,24 +112,25 @@ function generateFixCommand(
 ): string | undefined {
   if (!ecosystem || !pkgName || !version) return undefined;
   switch (ecosystem) {
-    case "composer": return `composer require ${pkgName}:^${version}`;
-    case "npm":      return `npm install ${pkgName}@${version}`;
-    case "pypi":     return `pip install ${pkgName}==${version}`;
-    case "golang":   return `go get ${pkgName}@v${version}`;
-    case "cargo":    return `cargo add ${pkgName}@${version}`;
-    case "gem":      return `gem install ${pkgName} -v ${version}`;
-    case "nuget":    return `dotnet add package ${pkgName} --version ${version}`;
-    case "maven":    return `<!-- pom.xml: <version>${version}</version> -->`;
-    default:         return undefined;
+    case "composer":
+      return `composer require ${pkgName}:^${version}`;
+    case "npm":
+      return `npm install ${pkgName}@${version}`;
+    case "pypi":
+      return `pip install ${pkgName}==${version}`;
+    case "golang":
+      return `go get ${pkgName}@v${version}`;
+    case "cargo":
+      return `cargo add ${pkgName}@${version}`;
+    case "gem":
+      return `gem install ${pkgName} -v ${version}`;
+    case "nuget":
+      return `dotnet add package ${pkgName} --version ${version}`;
+    case "maven":
+      return `<!-- pom.xml: <version>${version}</version> -->`;
+    default:
+      return undefined;
   }
-}
-
-function deriveUrgency(f: EnrichedFinding): "immediate" | "planned" | "deferred" {
-  if (f.kev) return "immediate";
-  if (f.severity === "critical") return "immediate";
-  const epss = f.epss?.epss ?? 0;
-  if (f.severity === "high" || (f.severity === "medium" && epss >= 0.4)) return "planned";
-  return "deferred";
 }
 
 function buildContext(f: EnrichedFinding): FindingContext {
@@ -130,24 +138,24 @@ function buildContext(f: EnrichedFinding): FindingContext {
     title: f.title,
   };
 
-  if (f.description)   ctx.description = f.description;
-  if (f.location)      ctx.location = f.location;
+  if (f.description) ctx.description = f.description;
+  if (f.location) ctx.location = f.location;
   if (f.cweIds?.length) ctx.cweIds = f.cweIds;
   const refUrl = f.canonicalReference ?? f.url;
   if (refUrl) ctx.url = refUrl;
 
-  if (f.osv?.summary)       ctx.osvSummary = f.osv.summary;
+  if (f.osv?.summary) ctx.osvSummary = f.osv.summary;
   if (f.osv?.aliases?.length) ctx.osvAliases = f.osv.aliases;
 
-  if (f.kev?.dateAdded)      ctx.kevDateAdded = f.kev.dateAdded;
+  if (f.kev?.dateAdded) ctx.kevDateAdded = f.kev.dateAdded;
   if (f.kev?.requiredAction) ctx.kevRequiredAction = f.kev.requiredAction;
 
   const hasAnalysis = f.clearwingRisk || f.clearwingIncidents || f.clearwingMemo;
   if (hasAnalysis) {
     ctx.analysisSource = "clearwing";
-    if (f.clearwingRisk)      ctx.attackCategory = f.clearwingRisk.trim();
+    if (f.clearwingRisk) ctx.attackCategory = f.clearwingRisk.trim();
     if (f.clearwingIncidents) ctx.impact = splitLines(f.clearwingIncidents);
-    if (f.clearwingMemo)      ctx.affectedFeatures = splitLines(f.clearwingMemo);
+    if (f.clearwingMemo) ctx.affectedFeatures = splitLines(f.clearwingMemo);
   }
 
   if (f.poc?.found && f.poc.sources.length > 0) {
@@ -181,10 +189,10 @@ function buildSummary(findings: ReportFinding[]): ReportSummary {
 
   for (const f of findings) {
     const sev = f.riskSignals.severity;
-    if (sev === "critical")     summary.critical++;
-    else if (sev === "high")    summary.high++;
-    else if (sev === "medium")  summary.medium++;
-    else if (sev === "low")     summary.low++;
+    if (sev === "critical") summary.critical++;
+    else if (sev === "high") summary.high++;
+    else if (sev === "medium") summary.medium++;
+    else if (sev === "low") summary.low++;
 
     if (f.recommendedAction.urgency === "immediate") summary.immediate++;
     if (f.riskSignals.kev) summary.kevCount++;

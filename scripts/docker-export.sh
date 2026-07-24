@@ -75,6 +75,11 @@ fi
 mkdir -p "$(dirname "$OUTPUT_FILE")"
 OUTPUT_FILE="$(cd "$(dirname "$OUTPUT_FILE")" && pwd -P)/$(basename "$OUTPUT_FILE")"
 
+if [[ "$OUTPUT_FILE" != "${_reports_dir}/"* ]]; then
+  echo "エラー: --output が REPORTS_DIR の外にあります。REPORTS_DIR 配下を指定してください。" >&2
+  exit 2
+fi
+
 # コンテナ内パスへ変換
 _container_input="/workspace/reports/${INPUT_FILE#${_reports_dir}/}"
 _container_output="/workspace/reports/${OUTPUT_FILE#${_reports_dir}/}"
@@ -100,5 +105,10 @@ case $_exit in
   *) echo "[sentry-export] エラー: 終了コード ${_exit} で終了しました。" >&2 ;;
 esac
 printf "[sentry-export] 所要時間: %d分%02d秒\n" "$(( _elapsed / 60 ))" "$(( _elapsed % 60 ))" >&2
+
+if [[ $_exit -eq 0 ]]; then
+  # stdout: 生成した PDF の相対パスのみ（docker-run.sh と同じ規則）
+  echo "${OUTPUT_FILE#${PWD}/}"
+fi
 
 exit $_exit

@@ -21,7 +21,7 @@ export type PocConfidence = "high" | "medium" | "low";
 
 export interface PocSource {
   url: string;
-  source: "osv-reference" | "github-search";
+  source: "osv-reference" | "exploitdb" | "github-search";
   reason: string;
 }
 

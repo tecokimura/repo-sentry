@@ -9,7 +9,7 @@ import { readJsonFile, writeTextFile } from "../shared/utils.ts";
 
 export interface ReportRequest {
   input: string;
-  planInput?: string;   // 指定時は AI 呼び出しをスキップして既存 plan を使用
+  planInput?: string; // 指定時は AI 呼び出しをスキップして既存 plan を使用
   planOutput?: string;
   reportOutput?: string;
   debugInputOutput?: string;

@@ -4,7 +4,7 @@ import { enrichWithOsv } from "./enrichers/osv.ts";
 import { enrichWithKev } from "./enrichers/kev.ts";
 import { enrichWithEpss } from "./enrichers/epss.ts";
 import { validateReferences } from "./enrichers/reference.ts";
-import { enrichWithGithubPoc } from "./enrichers/poc.ts";
+import { enrichWithExploitDbPoc, enrichWithGithubPoc } from "./enrichers/poc.ts";
 import { nowIso } from "../shared/utils.ts";
 import { readJsonFile } from "../shared/utils.ts";
 import { summarizeSeverities } from "../shared/utils.ts";
@@ -16,11 +16,16 @@ export async function runEnrich(request: EnrichRequest): Promise<EnrichedReport>
 
   const githubToken = Deno.env.get("GITHUB_TOKEN");
 
+  // DENO_DIR=/workspace/.repo-sentry/deno-cache → 親ディレクトリをキャッシュルートとして使用
+  const denoDir = Deno.env.get("DENO_DIR");
+  const cacheDir = denoDir ? denoDir.replace(/\/deno-cache\/?$/, "") : ".repo-sentry";
+
   [findings] = await Promise.all([
     enrichWithOsv(findings)
       .then((f) => enrichWithKev(f))
       .then((f) => enrichWithEpss(f))
       .then((f) => validateReferences(f))
+      .then((f) => enrichWithExploitDbPoc(f, { cacheDir }))
       .then((f) => {
         if (githubToken) {
           console.error(`[sentry-enrich] GitHub PoC 検索を実行します（GITHUB_TOKEN あり）`);

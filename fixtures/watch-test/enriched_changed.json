@@ -1,0 +1,100 @@
+{
+  "scanId": "SCAN0001",
+  "enrichId": "ENRI0002",
+  "profile": "fixture",
+  "scannedAt": "2025-12-01T00:00:00.000Z",
+  "enrichedAt": "2026-01-10T00:10:00.000Z",
+  "summary": { "critical": 0, "high": 1, "medium": 2, "low": 3, "info": 0, "unknown": 0 },
+  "collectorStatuses": [
+    {
+      "tool": "trivy",
+      "status": "completed",
+      "startedAt": "2025-12-01T00:00:00.000Z",
+      "finishedAt": "2025-12-01T00:01:00.000Z",
+      "durationMs": 60000,
+      "findingsCount": 6,
+      "notes": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "CVE-2999-1001",
+      "tool": "trivy",
+      "category": "dependency-vulnerability",
+      "severity": "high",
+      "title": "Prototype pollution in alpha-utils",
+      "status": "open",
+      "packageName": "alpha-utils",
+      "packageVersion": "1.2.3",
+      "epss": { "cve": "CVE-2999-1001", "epss": 0.15, "percentile": 0.72, "date": "2026-01-10" },
+      "kev": {
+        "cveId": "CVE-2999-1001",
+        "vendorProject": "DummyVendor",
+        "product": "alpha-utils",
+        "dateAdded": "2026-01-05",
+        "requiredAction": "Apply updates per vendor instructions.",
+        "dueDate": "2026-01-26"
+      }
+    },
+    {
+      "id": "CVE-2999-1002",
+      "tool": "trivy",
+      "category": "dependency-vulnerability",
+      "severity": "low",
+      "title": "Denial of service in alpha-utils",
+      "status": "open",
+      "packageName": "alpha-utils",
+      "packageVersion": "1.2.3",
+      "epss": { "cve": "CVE-2999-1002", "epss": 0.16, "percentile": 0.50, "date": "2026-01-10" }
+    },
+    {
+      "id": "CVE-2999-1003",
+      "tool": "trivy",
+      "category": "dependency-vulnerability",
+      "severity": "medium",
+      "title": "Path traversal in beta-parser",
+      "status": "open",
+      "packageName": "beta-parser",
+      "packageVersion": "0.9.1",
+      "epss": { "cve": "CVE-2999-1003", "epss": 0.41, "percentile": 0.90, "date": "2026-01-10" }
+    },
+    {
+      "id": "CVE-2999-1004",
+      "tool": "trivy",
+      "category": "dependency-vulnerability",
+      "severity": "low",
+      "title": "Information disclosure in gamma-codec",
+      "status": "open",
+      "packageName": "gamma-codec",
+      "packageVersion": "3.0.0",
+      "osv": {
+        "id": "CVE-2999-1004",
+        "summary": "Information disclosure",
+        "publishedAt": "2024-01-01T00:00:00.000Z",
+        "modifiedAt": "2025-03-10T00:00:00.000Z"
+      }
+    },
+    {
+      "id": "CVE-2999-1005",
+      "tool": "trivy",
+      "category": "dependency-vulnerability",
+      "severity": "medium",
+      "title": "SQL injection in delta-client",
+      "status": "open",
+      "packageName": "delta-client",
+      "packageVersion": "2.1.0",
+      "epss": { "cve": "CVE-2999-1005", "epss": 0.20, "percentile": 0.65, "date": "2026-01-10" }
+    },
+    {
+      "id": "CVE-2999-1007",
+      "tool": "trivy",
+      "category": "dependency-vulnerability",
+      "severity": "medium",
+      "title": "Command injection in gamma-codec",
+      "status": "open",
+      "packageName": "gamma-codec",
+      "packageVersion": "3.0.0",
+      "epss": { "cve": "CVE-2999-1007", "epss": 0.05, "percentile": 0.30, "date": "2026-01-10" }
+    }
+  ]
+}
