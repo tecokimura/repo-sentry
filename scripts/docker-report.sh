@@ -211,7 +211,7 @@ if [[ "$_provider" != "openai" && -z "${OPENAI_API_KEY:-}" ]]; then
 
   # モデルが未ダウンロードの場合のみ取得（ボリューム共有により再起動後も保持される）
   if docker ps --format '{{.Names}}' | grep -q "^${_ollama_container}$"; then
-    if ! docker exec "$_ollama_container" ollama list 2>/dev/null | grep -q "^${_ollama_model%%:*}"; then
+    if ! docker exec "$_ollama_container" ollama list 2>/dev/null | grep -qE "^${_ollama_model}[[:space:]]"; then
       echo "[sentry-report] モデルをダウンロード中: ${_ollama_model}（初回のみ、数分かかります）" >&2
       docker exec "$_ollama_container" ollama pull "$_ollama_model"
     fi
