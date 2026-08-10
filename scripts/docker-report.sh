@@ -25,7 +25,9 @@ Options:
   REPORT_LLM_MODEL      Ollama モデル名 (OLLAMA_MODEL でも可)
   OLLAMA_BASE_URL       Ollama ホスト URL (OLLAMA_HOST でも可)
   OLLAMA_CONTAINER      Ollama の Docker コンテナ名 (default: ollama-report)
-                        停止中の場合は自動起動する（OpenAI 使用時はスキップ）
+                        存在しない場合は自動作成する。停止中の場合は自動起動する（OpenAI 使用時はスキップ）
+  OLLAMA_MODEL          使用するモデル名 (default: qwen2.5:7b)
+                        未ダウンロードの場合は自動取得する（初回のみ、約 4GB）
   DATE_FORMAT           ファイル名のタイムスタンプ形式 (default: hour)
                         none: なし / date: YYYYMMDD / datetime: YYYYMMDD-HHMM / hour: YYMMDDHH
   REPORT_DATE           タイムスタンプ文字列を直接指定（DATE_FORMAT より優先）
@@ -34,13 +36,19 @@ Options:
 EOF
 }
 
-# DATE_FORMAT / REPORT_DATE はホスト側で使うため .env を直接読む
+# ホスト側で参照する変数は .env から直接読む（シェル環境変数が優先）
 _env_file="${ENV_FILE:-.env}"
 if [[ -z "${DATE_FORMAT:-}" && -f "$_env_file" ]]; then
   DATE_FORMAT="$(grep -E '^DATE_FORMAT=' "$_env_file" | tail -1 | cut -d= -f2-)"
 fi
 if [[ -z "${REPORT_DATE:-}" && -f "$_env_file" ]]; then
   REPORT_DATE="$(grep -E '^REPORT_DATE=' "$_env_file" | tail -1 | cut -d= -f2-)"
+fi
+if [[ -z "${REPORT_LLM_MODEL:-}" && -f "$_env_file" ]]; then
+  REPORT_LLM_MODEL="$(grep -E '^REPORT_LLM_MODEL=' "$_env_file" | tail -1 | cut -d= -f2-)"
+fi
+if [[ -z "${OLLAMA_MODEL:-}" && -f "$_env_file" ]]; then
+  OLLAMA_MODEL="$(grep -E '^OLLAMA_MODEL=' "$_env_file" | tail -1 | cut -d= -f2-)"
 fi
 
 IMAGE="${REPO_SENTRY_REPORT_IMAGE:-repo-sentry-report:local}"
@@ -162,17 +170,21 @@ if [[ -f "${ENV_FILE:-.env}" ]]; then
   _env_file_args=(--env-file "${ENV_FILE:-.env}")
 fi
 
-# Ollama コンテナの自動起動（OpenAI 使用時はスキップ）
+# Ollama コンテナの自動起動・自動作成（OpenAI 使用時はスキップ）
 _provider="${REPORT_LLM_PROVIDER:-${CLEARWING_PROVIDER:-}}"
 if [[ "$_provider" != "openai" && -z "${OPENAI_API_KEY:-}" ]]; then
   _ollama_container="${OLLAMA_CONTAINER:-ollama-report}"
+  _ollama_model="${REPORT_LLM_MODEL:-${OLLAMA_MODEL:-qwen2.5:7b}}"
+  _ollama_port="${OLLAMA_PORT:-11434}"
+
   if docker inspect "$_ollama_container" > /dev/null 2>&1; then
+    # コンテナが存在する → 停止中なら起動
     if ! docker ps --format '{{.Names}}' | grep -q "^${_ollama_container}$"; then
       echo "[sentry-report] Ollama コンテナを起動中: ${_ollama_container}" >&2
       docker start "$_ollama_container" > /dev/null
       echo "[sentry-report] Ollama の起動を待機中..." >&2
       _wait=0
-      until curl -sf "http://localhost:${OLLAMA_PORT:-11434}/api/tags" > /dev/null 2>&1 || [[ $_wait -ge 30 ]]; do
+      until curl -sf "http://localhost:${_ollama_port}/api/tags" > /dev/null 2>&1 || [[ $_wait -ge 30 ]]; do
         sleep 2
         _wait=$(( _wait + 2 ))
       done
@@ -183,7 +195,32 @@ if [[ "$_provider" != "openai" && -z "${OPENAI_API_KEY:-}" ]]; then
       fi
     fi
   else
-    echo "[sentry-report] 警告: Ollama コンテナ '${_ollama_container}' が見つかりません" >&2
+    # コンテナが存在しない → 初回セットアップ
+    echo "[sentry-report] Ollama コンテナを作成中: ${_ollama_container}（初回のみ）" >&2
+    docker run -d \
+      --name "$_ollama_container" \
+      -p "${_ollama_port}:11434" \
+      -v repo-sentry-ollama-models:/root/.ollama \
+      ollama/ollama > /dev/null
+    echo "[sentry-report] Ollama の起動を待機中..." >&2
+    _wait=0
+    until curl -sf "http://localhost:${_ollama_port}/api/tags" > /dev/null 2>&1 || [[ $_wait -ge 60 ]]; do
+      sleep 2
+      _wait=$(( _wait + 2 ))
+    done
+    if [[ $_wait -ge 60 ]]; then
+      echo "[sentry-report] 警告: Ollama 起動タイムアウト" >&2
+    else
+      echo "[sentry-report] Ollama 起動完了" >&2
+    fi
+  fi
+
+  # モデルが未ダウンロードの場合のみ取得（ボリューム共有により再起動後も保持される）
+  if docker ps --format '{{.Names}}' | grep -q "^${_ollama_container}$"; then
+    if ! docker exec "$_ollama_container" ollama list 2>/dev/null | grep -qE "^${_ollama_model}[[:space:]]"; then
+      echo "[sentry-report] モデルをダウンロード中: ${_ollama_model}（初回のみ、数分かかります）" >&2
+      docker exec "$_ollama_container" ollama pull "$_ollama_model"
+    fi
   fi
 fi
 
