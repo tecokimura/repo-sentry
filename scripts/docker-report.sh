@@ -36,13 +36,19 @@ Options:
 EOF
 }
 
-# DATE_FORMAT / REPORT_DATE はホスト側で使うため .env を直接読む
+# ホスト側で参照する変数は .env から直接読む（シェル環境変数が優先）
 _env_file="${ENV_FILE:-.env}"
 if [[ -z "${DATE_FORMAT:-}" && -f "$_env_file" ]]; then
   DATE_FORMAT="$(grep -E '^DATE_FORMAT=' "$_env_file" | tail -1 | cut -d= -f2-)"
 fi
 if [[ -z "${REPORT_DATE:-}" && -f "$_env_file" ]]; then
   REPORT_DATE="$(grep -E '^REPORT_DATE=' "$_env_file" | tail -1 | cut -d= -f2-)"
+fi
+if [[ -z "${REPORT_LLM_MODEL:-}" && -f "$_env_file" ]]; then
+  REPORT_LLM_MODEL="$(grep -E '^REPORT_LLM_MODEL=' "$_env_file" | tail -1 | cut -d= -f2-)"
+fi
+if [[ -z "${OLLAMA_MODEL:-}" && -f "$_env_file" ]]; then
+  OLLAMA_MODEL="$(grep -E '^OLLAMA_MODEL=' "$_env_file" | tail -1 | cut -d= -f2-)"
 fi
 
 IMAGE="${REPO_SENTRY_REPORT_IMAGE:-repo-sentry-report:local}"
