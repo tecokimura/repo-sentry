@@ -8,13 +8,13 @@ _die() { echo "[run-all] エラー: $*" >&2; exit 1; }
 
 usage() {
   cat <<'EOF'
-Usage: docker-run-all.sh [TARGET_DIR] [OPTIONS]
+Usage: docker-run-all.sh TARGET_DIR [OPTIONS]
 
 scan → enrich → report を一括実行します。
 途中でエラーが発生した場合は再開コマンドを表示します。
 
 Arguments:
-  TARGET_DIR              スキャン対象ディレクトリ (default: カレントディレクトリ)
+  TARGET_DIR              スキャン対象ディレクトリ (必須)
 
 再開オプション (エラー時に表示されるコマンドをそのままコピーして使えます):
   --from-scan   SCAN_JSON     scan_*.json からエンリッチ・レポートを再実行
@@ -76,6 +76,7 @@ elif [[ -n "$FROM_SCAN" ]]; then
   SCAN_OUTPUT="$(cd "$(dirname "$FROM_SCAN")" && pwd -P)/$(basename "$FROM_SCAN")"
   echo "[run-all] ステップ 1/3 をスキップ (--from-scan)" >&2
 else
+  [[ -n "$TARGET_DIR" ]] || { echo "[run-all] エラー: スキャン対象ディレクトリを指定してください" >&2; usage >&2; exit 2; }
   echo "[run-all] ステップ 1/3: スキャン" >&2
   : > "$_scan_log"
   _scan_exit=0
