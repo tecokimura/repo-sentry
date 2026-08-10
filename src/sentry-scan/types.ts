@@ -67,6 +67,12 @@ export interface Finding {
   raw?: unknown;
 }
 
+export interface DetectedEcosystem {
+  ecosystem: string;
+  target: string;
+  findingsCount: number;
+}
+
 export interface CollectorStatus {
   tool: ToolName;
   status: CollectorRunStatus;
@@ -78,6 +84,7 @@ export interface CollectorStatus {
   rawReportPath?: string;
   error?: string;
   notes: string[];
+  detectedEcosystems?: DetectedEcosystem[];
 }
 
 export interface ScanReport {

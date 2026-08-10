@@ -1,5 +1,5 @@
 import { completeCollector, failCollector, startCollector } from "./common.ts";
-import type { CollectorResult, Finding, FindingCategory, ScanRequest } from "../types.ts";
+import type { CollectorResult, DetectedEcosystem, Finding, FindingCategory, ScanRequest } from "../types.ts";
 import {
   ensureDir,
   readJsonFile,
@@ -91,6 +91,7 @@ export async function collectTrivy(request: ScanRequest): Promise<CollectorResul
 
     const report = await readJsonFile(rawReportPath);
     const findings = normalizeTrivyReport(report, rawReportPath);
+    const detectedEcosystems = extractDetectedEcosystems(report);
 
     const notes: string[] = [];
     if (request.sbom) {
@@ -99,7 +100,11 @@ export async function collectTrivy(request: ScanRequest): Promise<CollectorResul
       notes.push(sbomError ?? `SBOM generated: ${sbomPath}`);
     }
 
-    const status = completeCollector("trivy", timing, findings.length, { rawReportPath, notes });
+    const status = completeCollector("trivy", timing, findings.length, {
+      rawReportPath,
+      notes,
+      detectedEcosystems,
+    });
 
     return { status, findings };
   } catch (error) {
@@ -239,6 +244,43 @@ function normalizeVulnerability(
       type: result.Type,
     },
   };
+}
+
+// Trivy が検出する言語パッケージマネージャーの type 一覧
+const LANGUAGE_PACKAGE_TYPES = new Set([
+  "composer",
+  "npm", "yarn", "node-pkg", "pnpm",
+  "pip", "pipenv", "poetry", "uv",
+  "gomod", "gobinary",
+  "cargo",
+  "gem", "bundler",
+  "nuget",
+  "maven", "gradle",
+  "swift", "cocoapods",
+  "pub", "dart",
+  "mix", "hex",
+  "julia",
+  "conan",
+  "conda",
+  "sbt",
+  "hackage",
+]);
+
+function extractDetectedEcosystems(report: unknown): DetectedEcosystem[] {
+  const trivyReport = report as TrivyReport;
+  const results = Array.isArray(trivyReport.Results) ? trivyReport.Results : [];
+  const ecosystems: DetectedEcosystem[] = [];
+
+  for (const result of results) {
+    if (!result.Target || !result.Type) continue;
+    if (!LANGUAGE_PACKAGE_TYPES.has(result.Type)) continue;
+
+    const ecosystem = trivyTypeToEcosystem(result.Type) || result.Type;
+    const findingsCount = result.Vulnerabilities?.length ?? 0;
+    ecosystems.push({ ecosystem, target: result.Target, findingsCount });
+  }
+
+  return ecosystems;
 }
 
 function trivyTypeToEcosystem(type: string | undefined): string {

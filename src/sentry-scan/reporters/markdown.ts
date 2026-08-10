@@ -31,6 +31,14 @@ export function renderMarkdownReport(report: ScanReport): string {
   lines.push(renderCollectorStatusTable(report.collectorStatuses));
   lines.push("");
 
+  const ecosystemLines = renderEcosystemCoverageTable(report.collectorStatuses);
+  if (ecosystemLines) {
+    lines.push("## スキャン対象エコシステム");
+    lines.push("");
+    lines.push(ecosystemLines);
+    lines.push("");
+  }
+
   lines.push("## Findings");
   lines.push("");
 
@@ -117,6 +125,22 @@ const statusJa: Record<CollectorRunStatus, string> = {
   failed: "失敗",
   skipped: "スキップ",
 };
+
+function renderEcosystemCoverageTable(statuses: CollectorStatus[]): string | null {
+  const all = statuses.flatMap((s) => s.detectedEcosystems ?? []);
+  if (all.length === 0) return null;
+
+  const rows = all.map((e) => {
+    const status = e.findingsCount > 0 ? `**${e.findingsCount} 件**` : "0 件（問題なし）";
+    return `| ${e.ecosystem} | ${escapeMarkdown(e.target)} | ${status} |`;
+  });
+
+  return [
+    "| エコシステム | 対象ファイル | 検出数 |",
+    "| --- | --- | ---: |",
+    ...rows,
+  ].join("\n");
+}
 
 function renderCollectorStatusTable(statuses: CollectorStatus[]): string {
   if (statuses.length === 0) return "_Collector が実行されませんでした。_";

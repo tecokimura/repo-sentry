@@ -1,4 +1,4 @@
-import type { CollectorResult, CollectorStatus, ToolName } from "../types.ts";
+import type { CollectorResult, CollectorStatus, DetectedEcosystem, ToolName } from "../types.ts";
 import { elapsedMs, nowIso, safeErrorMessage, sanitizeForLog } from "../../shared/utils.ts";
 
 export interface CollectorTiming {
@@ -21,6 +21,7 @@ export function completeCollector(
     rawReportPath?: string;
     notes?: string[];
     sourceStatus?: CollectorStatus["sourceStatus"];
+    detectedEcosystems?: DetectedEcosystem[];
   } = {},
 ): CollectorStatus {
   return {
@@ -33,6 +34,7 @@ export function completeCollector(
     sourceStatus: options.sourceStatus,
     rawReportPath: options.rawReportPath,
     notes: options.notes ?? [],
+    detectedEcosystems: options.detectedEcosystems,
   };
 }
 
