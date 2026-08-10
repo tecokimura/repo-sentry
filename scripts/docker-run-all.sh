@@ -82,6 +82,7 @@ else
   _scan_exit=0
   "$SCRIPT_DIR/docker-scan.sh" \
     ${TARGET_DIR:+"$TARGET_DIR"} \
+    --format json \
     ${EXTRA_SCAN_ARGS[@]+"${EXTRA_SCAN_ARGS[@]}"} \
     2> >(tee -a "$_scan_log" >&2) || _scan_exit=$?
   wait
