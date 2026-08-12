@@ -25,7 +25,7 @@ export async function main(args: string[] = Deno.args): Promise<number> {
 }
 
 function parseArgs(args: string[]): ReportRequest {
-  const req: Partial<ReportRequest> & { planner: ReportRequest["planner"] } = { planner: {} };
+  const req: Partial<ReportRequest> & { planner: ReportRequest["planner"] } = { planner: {}, lang: undefined };
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -67,6 +67,11 @@ function parseArgs(args: string[]): ReportRequest {
   if (!req.planner.ollamaHost) {
     req.planner.ollamaHost = Deno.env.get("OLLAMA_BASE_URL") || Deno.env.get("OLLAMA_HOST");
   }
+  // REPORT_LANG: "ja" のみ日本語、それ以外または未設定は英語（デフォルト）
+  if (!req.lang) {
+    const l = Deno.env.get("REPORT_LANG");
+    if (l === "ja") req.lang = "ja";
+  }
 
   if (!req.input) throw new Error("--input is required");
   return req as ReportRequest;
@@ -95,6 +100,7 @@ Environment variables:
   REPORT_LLM_PROVIDER          LLM provider: openai or ollama (CLEARWING_PROVIDER as fallback)
   REPORT_LLM_MODEL             Ollama model (OLLAMA_MODEL as fallback)
   OLLAMA_BASE_URL              Ollama host URL (OLLAMA_HOST as fallback)
+  REPORT_LANG                  Report language: en (default) or ja
 `;
 }
 

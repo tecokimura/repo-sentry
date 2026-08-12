@@ -2,6 +2,7 @@ import type { ReportFinding, ReportInput } from "./types.ts";
 import type { ReportPlan } from "./plan.ts";
 import { REPORT_PLAN_VERSION } from "./plan.ts";
 import { safeErrorMessage } from "../shared/utils.ts";
+import type { ReportLang } from "./lang.ts";
 
 const DEFAULT_OLLAMA_HOST = "http://host.docker.internal:11434";
 const DEFAULT_OLLAMA_MODEL = "llama3.2";
@@ -14,6 +15,7 @@ export interface PlannerConfig {
   ollamaModel?: string;
   openaiApiKey?: string;
   openaiModel?: string;
+  lang?: ReportLang;
 }
 
 export async function generateReportPlan(
@@ -32,8 +34,9 @@ export async function generateReportPlan(
     throw new Error("OPENAI_API_KEY が設定されていません");
   }
 
-  const systemPrompt = await loadSystemPrompt();
-  const userPrompt = buildUserPrompt(input);
+  const lang = config.lang ?? "en";
+  const systemPrompt = await loadSystemPrompt(lang);
+  const userPrompt = buildUserPrompt(input, lang);
 
   console.error(`[sentry-report] provider: ${provider}, model: ${model}`);
 
@@ -41,12 +44,13 @@ export async function generateReportPlan(
   return parseReportPlan(raw);
 }
 
-async function loadSystemPrompt(): Promise<string> {
-  const url = new URL("./prompts/report-plan.md", import.meta.url);
+async function loadSystemPrompt(lang: ReportLang): Promise<string> {
+  const file = lang === "ja" ? "./prompts/report-plan.md" : "./prompts/report-plan-en.md";
+  const url = new URL(file, import.meta.url);
   return await Deno.readTextFile(url);
 }
 
-function buildUserPrompt(input: ReportInput): string {
+function buildUserPrompt(input: ReportInput, lang: ReportLang): string {
   // deferred は件数と severity 内訳のみ渡す（詳細はレンダー時に決定論的生成）
   const actionFindings = input.findings.filter(
     (f) => f.recommendedAction.urgency !== "deferred",
@@ -69,9 +73,10 @@ function buildUserPrompt(input: ReportInput): string {
     compact.deferredSummary = { count: deferredCount, severityBreakdown: deferredBySeverity };
   }
 
-  return `下記のスキャン結果データに基づき、system prompt のスキーマ通りの JSON を出力してください。説明文は不要です。\n\n${
-    JSON.stringify(compact, null, 2)
-  }`;
+  const instruction = lang === "ja"
+    ? "下記のスキャン結果データに基づき、system prompt のスキーマ通りの JSON を出力してください。説明文は不要です。"
+    : "Based on the scan result data below, output JSON exactly matching the schema in the system prompt. No explanation needed.";
+  return `${instruction}\n\n${JSON.stringify(compact, null, 2)}`;
 }
 
 function compactFinding(f: ReportFinding): Record<string, unknown> {

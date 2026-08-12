@@ -2,6 +2,8 @@ import type { EnrichedReport } from "../sentry-enrich/types.ts";
 import type { ReportInput } from "./types.ts";
 import type { ReportPlan } from "./plan.ts";
 import type { PlannerConfig } from "./planner.ts";
+import type { ReportLang } from "./lang.ts";
+import { DEFAULT_LANG } from "./lang.ts";
 import { buildReportInput } from "./transformer.ts";
 import { generateReportPlan, normalizeReportPlan } from "./planner.ts";
 import { renderMarkdownReport } from "./renderers/markdown.ts";
@@ -14,6 +16,7 @@ export interface ReportRequest {
   reportOutput?: string;
   debugInputOutput?: string;
   planner: PlannerConfig;
+  lang?: ReportLang;
 }
 
 export interface ReportResult {
@@ -23,6 +26,7 @@ export interface ReportResult {
 }
 
 export async function runReport(request: ReportRequest): Promise<ReportResult> {
+  const lang: ReportLang = request.lang ?? DEFAULT_LANG;
   const enriched = await readJsonFile(request.input) as EnrichedReport;
 
   const reportInput = buildReportInput(enriched);
@@ -32,12 +36,14 @@ export async function runReport(request: ReportRequest): Promise<ReportResult> {
     console.error(`[sentry-report] debug: report-input → ${request.debugInputOutput}`);
   }
 
+  const plannerConfig: PlannerConfig = { ...request.planner, lang };
+
   let plan: ReportPlan;
   if (request.planInput) {
     plan = normalizeReportPlan(await readJsonFile(request.planInput) as ReportPlan);
     console.error(`[sentry-report] plan     ← ${request.planInput} (再利用)`);
   } else {
-    plan = await generateReportPlan(reportInput, request.planner);
+    plan = await generateReportPlan(reportInput, plannerConfig);
   }
 
   if (request.planOutput) {
@@ -45,7 +51,7 @@ export async function runReport(request: ReportRequest): Promise<ReportResult> {
     console.error(`[sentry-report] plan     → ${request.planOutput}`);
   }
 
-  const markdown = renderMarkdownReport(plan, reportInput);
+  const markdown = renderMarkdownReport(plan, reportInput, lang);
 
   if (request.reportOutput) {
     await writeTextFile(request.reportOutput, markdown);

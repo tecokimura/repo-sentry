@@ -33,6 +33,7 @@ Options:
   REPORT_DATE           タイムスタンプ文字列を直接指定（DATE_FORMAT より優先）
   REPORTS_DIR           reports ルートディレクトリ (default: 入力ファイルの親の親)
   DOCKER_USER           Docker 実行ユーザー (default: 現在の UID:GID)
+  REPORT_LANG           レポート言語: en (default) または ja
 EOF
 }
 
@@ -233,6 +234,7 @@ docker run --rm \
   -e REPORT_LLM_PROVIDER \
   -e REPORT_LLM_MODEL \
   -e OLLAMA_BASE_URL \
+  -e REPORT_LANG \
   -v "${_reports_dir}:/workspace/reports" \
   -v "${CACHE_DIR}:/workspace/.repo-sentry" \
   --add-host=host.docker.internal:host-gateway \

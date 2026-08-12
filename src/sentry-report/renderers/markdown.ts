@@ -1,6 +1,7 @@
 import type { PlanAction, PlanDeferral, ReportPlan } from "../plan.ts";
 import type { ReportFinding, ReportInput, ReportSummary } from "../types.ts";
 import { cmpSemVer, filterAvailableVersions, parseSemVer } from "../semver.ts";
+import type { ReportLang } from "../lang.ts";
 
 function semverGt(a: string, b: string): boolean {
   const pa = parseSemVer(a);
@@ -9,7 +10,8 @@ function semverGt(a: string, b: string): boolean {
   return cmpSemVer(pa, pb) > 0;
 }
 
-export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): string {
+export function renderMarkdownReport(plan: ReportPlan, input: ReportInput, lang: ReportLang = "en"): string {
+  const t = lang === "ja" ? JA : EN;
   const lines: string[] = [];
   const scanDate = input.scannedAt.slice(0, 16).replace("T", " ");
   // AI reason / notes を findingId で引けるよう平坦化
@@ -27,24 +29,25 @@ export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): stri
 
   // Title
   const title = input.repository
-    ? `セキュリティスキャンレポート: ${input.repository}`
-    : "セキュリティスキャンレポート";
+    ? `${t.reportTitle}: ${input.repository}`
+    : t.reportTitle;
   lines.push(`# ${title}`);
   lines.push("");
 
   // 1. Executive Summary
-  lines.push("## エグゼクティブサマリー");
+  lines.push(`## ${t.executiveSummary}`);
   lines.push("");
-  lines.push(`**総合リスク評価: ${riskLabel(plan.overallRisk)}**`);
+  lines.push(`**${t.overallRisk}: ${riskLabel(plan.overallRisk, lang)}**`);
   lines.push("");
   // 決定論的な事実文（Renderer生成）
-  lines.push(buildSummaryOpening(input.summary, immediateFindings.length));
+  lines.push(buildSummaryOpening(input.summary, immediateFindings.length, lang));
   lines.push("");
   // AI の executiveSummary は補足文として使用（問題のある文を除外し残りを表示）
   if (plan.executiveSummary) {
     const { cleaned, removedCount } = sanitizeImmediateExpressions(
       plan.executiveSummary,
       immediateFindings.length,
+      lang,
     );
     if (removedCount > 0) {
       console.error(
@@ -53,7 +56,7 @@ export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): stri
     }
     const summaryText = cleaned.trim();
     if (summaryText) {
-      const conflicts = detectSummaryConflicts(summaryText, input.summary, plannedFindings.length);
+      const conflicts = detectSummaryConflicts(summaryText, input.summary, plannedFindings.length, lang);
       if (conflicts.length > 0) {
         for (const c of conflicts) {
           console.error(`[sentry-report] warning: executiveSummary が summaryFacts と矛盾: ${c}`);
@@ -76,66 +79,65 @@ export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): stri
   }
 
   // 2. Scan Overview
-  lines.push("## スキャン概要");
+  lines.push(`## ${t.scanOverview}`);
   lines.push("");
   lines.push("| | |");
   lines.push("| --- | --- |");
-  lines.push(`| スキャン日時 | ${scanDate} (UTC) |`);
-  if (input.repository) lines.push(`| 対象リポジトリ | ${escMd(input.repository)} |`);
-  lines.push(`| 検出総数 | ${input.summary.total} 件 |`);
+  lines.push(`| ${t.scanDate} | ${scanDate} (UTC) |`);
+  if (input.repository) lines.push(`| ${t.repository} | ${escMd(input.repository)} |`);
+  lines.push(`| ${t.totalFindings} | ${input.summary.total} |`);
   lines.push(`| Critical | ${input.summary.critical} |`);
   lines.push(`| High | ${input.summary.high} |`);
   lines.push(`| Medium | ${input.summary.medium} |`);
   lines.push(`| Low | ${input.summary.low} |`);
   if (input.summary.kevCount > 0) {
-    lines.push(`| KEV（実悪用確認） | **${input.summary.kevCount} 件** |`);
+    lines.push(`| ${t.kev} | **${input.summary.kevCount}** |`);
   }
   if (input.summary.epssHighCount > 0) {
-    lines.push(`| EPSS ≥ 70% | ${input.summary.epssHighCount} 件 |`);
+    lines.push(`| EPSS ≥ 70% | ${input.summary.epssHighCount} |`);
   }
-  // 即時対応は正規化後の件数（ReportInput.urgency ベース）
-  lines.push(`| 即時対応が必要 | **${immediateFindings.length} 件** |`);
+  lines.push(`| ${t.immediateRequired} | **${immediateFindings.length}** |`);
   lines.push("");
 
   // 3. 推奨対応順序
-  lines.push(...renderRecommendedActions(immediateFindings, plannedFindings, deferredFindings));
+  lines.push(...renderRecommendedActions(immediateFindings, plannedFindings, deferredFindings, t));
 
   // 4. Immediate Actions（ReportInput urgency=immediate が権威）
   if (immediateFindings.length > 0) {
-    lines.push("## 即時対応項目");
+    lines.push(`## ${t.immediateItems}`);
     lines.push("");
     if (immediateFindings.length >= 2) {
-      lines.push(...renderPackageSummaryTable(immediateFindings));
+      lines.push(...renderPackageSummaryTable(immediateFindings, t));
     }
     for (const f of immediateFindings) {
-      lines.push(...renderFindingWithPlan(f, planLookup, "immediate"));
+      lines.push(...renderFindingWithPlan(f, planLookup, "immediate", t));
     }
   }
 
   // 5. Planned Actions（ReportInput urgency=planned が権威）
   if (plannedFindings.length > 0) {
-    lines.push("## 計画対応項目");
+    lines.push(`## ${t.plannedItems}`);
     lines.push("");
     if (plannedFindings.length >= 2) {
-      lines.push(...renderPackageSummaryTable(plannedFindings));
+      lines.push(...renderPackageSummaryTable(plannedFindings, t));
     }
     for (const f of plannedFindings) {
-      lines.push(...renderFindingWithPlan(f, planLookup, "planned"));
+      lines.push(...renderFindingWithPlan(f, planLookup, "planned", t));
     }
   }
 
   // 6. Deferred Items → パッケージ単位の集約テーブルに圧縮
   if (deferredFindings.length > 0) {
-    lines.push(...renderDeferredCompact(deferredFindings));
+    lines.push(...renderDeferredCompact(deferredFindings, t));
   }
 
-  // 6. Fix Guide
+  // Fix Guide
   // 同パッケージに複数の CVE がある場合、最大の recommendedVersion を採用する
   const fixable = input.findings.filter((f) => f.recommendedAction.fixAvailable);
   if (fixable.length > 0) {
-    lines.push("## 修正ガイド");
+    lines.push(`## ${t.fixGuide}`);
     lines.push("");
-    lines.push("| パッケージ | 現在バージョン | 推奨バージョン |");
+    lines.push(`| ${t.colPackage} | ${t.colCurrentVersion} | ${t.colRecommendedVersion} |`);
     lines.push("| --- | --- | --- |");
     const fixMap = new Map<string, { pkg: string; cur: string; rec: string; cmd: string }>();
     for (const f of fixable) {
@@ -157,7 +159,7 @@ export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): stri
     lines.push("");
     const cmds = [...fixMap.values()].map(({ cmd }) => cmd).filter(Boolean);
     if (cmds.length > 0) {
-      lines.push("**更新コマンド:**");
+      lines.push(`**${t.updateCommands}:**`);
       lines.push("");
       lines.push("```bash");
       for (const cmd of cmds) lines.push(cmd);
@@ -166,10 +168,10 @@ export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): stri
     }
   }
 
-  // 7. Appendix
-  lines.push("## 付録: 全 Finding 一覧");
+  // Appendix
+  lines.push(`## ${t.appendix}`);
   lines.push("");
-  lines.push("| ID | パッケージ | 重大度 | EPSS | KEV | 対応 | urgency |");
+  lines.push(`| ID | ${t.colPackage} | ${t.colSeverity} | EPSS | KEV | ${t.colAction} | urgency |`);
   lines.push("| --- | --- | --- | --- | --- | --- | --- |");
   for (const f of input.findings) {
     const id = f.findingId ?? "—";
@@ -188,14 +190,191 @@ export function renderMarkdownReport(plan: ReportPlan, input: ReportInput): stri
   return lines.join("\n") + "\n";
 }
 
-const FALLBACK_REASON = {
-  immediate: "悪用状況または重大度を踏まえ、優先的に確認・対応してください。",
-  planned: "修正版が提供されているため、通常のアップデート計画に組み込んで対応してください。",
-  deferred:
-    "現時点では即時対応条件には該当しないため、他の高優先度項目の対応後に確認してください。",
-} as const;
+interface LangStrings {
+  reportTitle: string;
+  executiveSummary: string;
+  overallRisk: string;
+  scanOverview: string;
+  scanDate: string;
+  repository: string;
+  totalFindings: string;
+  kev: string;
+  immediateRequired: string;
+  recommendedActions: string;
+  immediateItems: string;
+  plannedItems: string;
+  deferredItems: (n: number) => string;
+  fixGuide: string;
+  appendix: string;
+  updateCommands: string;
+  colPackage: string;
+  colCurrentVersion: string;
+  colRecommendedVersion: string;
+  colSeverity: string;
+  colAction: string;
+  colCveCount: string;
+  colMaxSev: string;
+  pkgSummary: string;
+  actionDeadlineCol: string;
+  actionTargetCol: string;
+  actionCountCol: string;
+  actionRecommendedCol: string;
+  thisWeek: string;
+  thisMonth: string;
+  nextScheduled: string;
+  noImmediate: string;
+  noPlanned: string;
+  perPackageUpdate: string;
+  scheduledUpdate: string;
+  packageUpdate: string;
+  fallbackImmediate: string;
+  fallbackPlanned: string;
+  fallbackDeferred: string;
+  deferReasonNoPackage: string;
+  deferReasonTransitive: (pkg: string) => string;
+  deferReasonLimitedScope: (pkg: string, feat: string) => string;
+  deferReasonLowSeverity: (pkg: string, sev: string) => string;
+  deferReasonDefault: (pkg: string) => string;
+  deferNow: (n: number) => string;
+  deferNote: string;
+  thisWeekSection: (n: number) => string;
+  thisMonthSection: (n: number, p: number) => string;
+  nextScheduledSection: (n: number) => string;
+  kevConfirmed: (date?: string) => string;
+  pocBadgeHigh: string;
+  pocBadgeMedium: string;
+  pocBadgeLow: string;
+  pocLabel: (badge: string, n: number) => string;
+  purl: string;
+  recommendedFix: string;
+  available: string;
+  percentile: string;
+}
 
-const CONTRADICTION_PATTERNS: Record<"immediate" | "planned" | "deferred", string[]> = {
+const EN: LangStrings = {
+  reportTitle: "Security Scan Report",
+  executiveSummary: "Executive Summary",
+  overallRisk: "Overall Risk",
+  scanOverview: "Scan Overview",
+  scanDate: "Scan Date",
+  repository: "Repository",
+  totalFindings: "Total Findings",
+  kev: "KEV (Active Exploitation)",
+  immediateRequired: "Immediate Action Required",
+  recommendedActions: "Recommended Action Plan",
+  immediateItems: "Immediate Actions",
+  plannedItems: "Planned Actions",
+  deferredItems: (n) => `Deferred Items (${n})`,
+  fixGuide: "Fix Guide",
+  appendix: "Appendix: All Findings",
+  updateCommands: "Update commands",
+  colPackage: "Package",
+  colCurrentVersion: "Current Version",
+  colRecommendedVersion: "Recommended Version",
+  colSeverity: "Severity",
+  colAction: "Action",
+  colCveCount: "CVEs",
+  colMaxSev: "Max Severity",
+  pkgSummary: "Package Summary",
+  actionDeadlineCol: "Deadline",
+  actionTargetCol: "Target",
+  actionCountCol: "Count",
+  actionRecommendedCol: "Recommended Action",
+  thisWeek: "This week",
+  thisMonth: "This month",
+  nextScheduled: "Next scheduled",
+  noImmediate: "No items require immediate action.",
+  noPlanned: "No items require planned action.",
+  perPackageUpdate: "Update packages",
+  scheduledUpdate: "Update at next maintenance",
+  packageUpdate: "Planned update",
+  fallbackImmediate: "Please review and remediate promptly given the severity or known exploitation.",
+  fallbackPlanned: "A fix is available — include this in your regular update schedule.",
+  fallbackDeferred: "Does not meet immediate action criteria at this time. Review after higher-priority items.",
+  deferReasonNoPackage: "Configuration finding that does not meet immediate action criteria (no KEV, not critical).",
+  deferReasonTransitive: (pkg) => `${pkg} is a transitive dependency with indirect exposure — can be deferred.`,
+  deferReasonLimitedScope: (pkg, feat) => `${pkg} impact is limited to ${feat} — can be deferred.`,
+  deferReasonLowSeverity: (pkg, sev) => `${pkg} is severity ${sev}, which does not meet immediate action criteria.`,
+  deferReasonDefault: (pkg) => `${pkg} has a fix available but does not meet critical/KEV immediate criteria — can be deferred.`,
+  deferNow: (n) => `${n} item(s) were deferred to the next scheduled maintenance. See the Appendix for details.`,
+  deferNote: "Does not meet immediate action criteria at this time. Review after higher-priority items.",
+  thisWeekSection: (n) => `### (1) This week (${n} item${n !== 1 ? "s" : ""})`,
+  thisMonthSection: (n, p) => `### (2) This month (${n} item${n !== 1 ? "s" : ""} / ${p} package${p !== 1 ? "s" : ""})`,
+  nextScheduledSection: (n) => `### (3) Next scheduled update (${n} item${n !== 1 ? "s" : ""})`,
+  kevConfirmed: (date?) => `Actively exploited${date ? ` (added ${date})` : ""}`,
+  pocBadgeHigh: "High confidence",
+  pocBadgeMedium: "Medium confidence",
+  pocBadgeLow: "Low confidence",
+  pocLabel: (badge, n) => `Public PoC [${badge}] (${n} source${n !== 1 ? "s" : ""})`,
+  purl: "PURL",
+  recommendedFix: "Recommended Fix",
+  available: "Available Fixes",
+  percentile: "percentile",
+};
+
+const JA: LangStrings = {
+  reportTitle: "セキュリティスキャンレポート",
+  executiveSummary: "エグゼクティブサマリー",
+  overallRisk: "総合リスク評価",
+  scanOverview: "スキャン概要",
+  scanDate: "スキャン日時",
+  repository: "対象リポジトリ",
+  totalFindings: "検出総数",
+  kev: "KEV（実悪用確認）",
+  immediateRequired: "即時対応が必要",
+  recommendedActions: "推奨対応順序",
+  immediateItems: "即時対応項目",
+  plannedItems: "計画対応項目",
+  deferredItems: (n) => `後回し可能項目（${n}件）`,
+  fixGuide: "修正ガイド",
+  appendix: "付録: 全 Finding 一覧",
+  updateCommands: "更新コマンド",
+  colPackage: "パッケージ",
+  colCurrentVersion: "現在バージョン",
+  colRecommendedVersion: "推奨バージョン",
+  colSeverity: "重大度",
+  colAction: "対応",
+  colCveCount: "CVE数",
+  colMaxSev: "最大重大度",
+  pkgSummary: "パッケージ別サマリー",
+  actionDeadlineCol: "対応期限",
+  actionTargetCol: "対象",
+  actionCountCol: "件数",
+  actionRecommendedCol: "推奨アクション",
+  thisWeek: "今週中",
+  thisMonth: "今月中",
+  nextScheduled: "次回定期",
+  noImmediate: "即時対応が必要な項目はありません。",
+  noPlanned: "計画対応が必要な項目はありません。",
+  perPackageUpdate: "各パッケージを更新",
+  scheduledUpdate: "定期更新で対応",
+  packageUpdate: "計画アップデート",
+  fallbackImmediate: "悪用状況または重大度を踏まえ、優先的に確認・対応してください。",
+  fallbackPlanned: "修正版が提供されているため、通常のアップデート計画に組み込んで対応してください。",
+  fallbackDeferred: "現時点では即時対応条件には該当しないため、他の高優先度項目の対応後に確認してください。",
+  deferReasonNoPackage: "設定上の指摘であり、即時対応条件（KEV・critical）には該当しないため後回し可能。",
+  deferReasonTransitive: (pkg) => `${pkg} は transitive 依存のため影響が間接的であり後回し可能。`,
+  deferReasonLimitedScope: (pkg, feat) => `${pkg} は影響範囲が ${feat} に限定されるため後回し可能。`,
+  deferReasonLowSeverity: (pkg, sev) => `${pkg} は severity が ${sev} であり即時対応条件に該当しないため後回し可能。`,
+  deferReasonDefault: (pkg) => `${pkg} は修正版が提供されているが critical・KEV の即時対応条件には該当しないため後回し可能。`,
+  deferNow: (n) => `${n} 件は後回し可能と判断しました。詳細は「後回し可能項目」セクションを参照してください。`,
+  deferNote: "後回し理由",
+  thisWeekSection: (n) => `### (1) 今週中（${n}件）`,
+  thisMonthSection: (n, p) => `### (2) 今月中（${n}件 / ${p}パッケージ）`,
+  nextScheduledSection: (n) => `### (3) 次回定期アップデート時（${n}件）`,
+  kevConfirmed: (date?) => `悪用確認済み${date ? ` (${date})` : ""}`,
+  pocBadgeHigh: "⚠ 高信頼度",
+  pocBadgeMedium: "中信頼度",
+  pocBadgeLow: "低信頼度",
+  pocLabel: (badge, n) => `公開済み [${badge}] (${n} 件)`,
+  purl: "PURL",
+  recommendedFix: "推奨修正版",
+  available: "利用可能",
+  percentile: "パーセンタイル",
+};
+
+
+const CONTRADICTION_PATTERNS_JA: Record<"immediate" | "planned" | "deferred", string[]> = {
   immediate: [
     "後回しでよい",
     "後回しで良い",
@@ -223,30 +402,48 @@ const CONTRADICTION_PATTERNS: Record<"immediate" | "planned" | "deferred", strin
   ],
 };
 
+const CONTRADICTION_PATTERNS_EN: Record<"immediate" | "planned" | "deferred", string[]> = {
+  immediate: [
+    "can be deferred",
+    "low priority",
+    "no immediate action",
+    "plan for later",
+  ],
+  planned: [
+    "can be deferred",
+    "immediately remediate",
+    "urgent action required",
+    "critical action needed",
+  ],
+  deferred: [
+    "immediate action required",
+    "must be fixed immediately",
+    "urgent",
+    "fix now",
+  ],
+};
+
 function sanitizeReason(
   text: string | undefined,
   section: "immediate" | "planned" | "deferred",
+  t: LangStrings,
   findingId?: string,
 ): string {
-  if (!text) return FALLBACK_REASON[section];
-  const contradicts = CONTRADICTION_PATTERNS[section].some((p) => text.includes(p));
+  const fallback = { immediate: t.fallbackImmediate, planned: t.fallbackPlanned, deferred: t.fallbackDeferred };
+  const patterns = t === JA ? CONTRADICTION_PATTERNS_JA : CONTRADICTION_PATTERNS_EN;
+  if (!text) return fallback[section];
+  const contradicts = patterns[section].some((p) => text.includes(p));
   if (contradicts) {
     console.error(
-      `[sentry-report] warning: ${
-        findingId ?? "?"
-      } の reason が ${section} セクションと矛盾するためデフォルト文に置き換えました`,
+      `[sentry-report] warning: ${findingId ?? "?"} reason contradicts section=${section}, using default`,
     );
-    return FALLBACK_REASON[section];
+    return fallback[section];
   }
   return text;
 }
 
-// deferred 理由を ReportFinding のデータから決定論的に生成（AI に委ねない）
-function buildDeferReason(f: ReportFinding): string {
-  // パッケージなし（設定ミス・Dockerfile 系）
-  if (!f.package) {
-    return "設定上の指摘であり、即時対応条件（KEV・critical）には該当しないため後回し可能。";
-  }
+function buildDeferReason(f: ReportFinding, t: LangStrings): string {
+  if (!f.package) return t.deferReasonNoPackage;
 
   const kev = f.riskSignals.kev;
   const epss = f.riskSignals.epss;
@@ -256,18 +453,14 @@ function buildDeferReason(f: ReportFinding): string {
   const pkg = f.package.name;
 
   if (!kev && (epss === undefined || epss < 0.01)) {
-    return `${pkg} は KEV 未登録かつ悪用可能性が低いため後回し可能。`;
+    return t === JA
+      ? `${pkg} は KEV 未登録かつ悪用可能性が低いため後回し可能。`
+      : `${pkg} is not in KEV and has low exploitation probability — can be deferred.`;
   }
-  if (dep === "transitive") {
-    return `${pkg} は transitive 依存のため影響が間接的であり後回し可能。`;
-  }
-  if (feat && feat.length > 0) {
-    return `${pkg} は影響範囲が ${feat.join("・")} に限定されるため後回し可能。`;
-  }
-  if (sev === "low" || sev === "unknown") {
-    return `${pkg} は severity が ${sev} であり即時対応条件に該当しないため後回し可能。`;
-  }
-  return `${pkg} は修正版が提供されているが critical・KEV の即時対応条件には該当しないため後回し可能。`;
+  if (dep === "transitive") return t.deferReasonTransitive(pkg);
+  if (feat && feat.length > 0) return t.deferReasonLimitedScope(pkg, feat.join(t === JA ? "・" : ", "));
+  if (sev === "low" || sev === "unknown") return t.deferReasonLowSeverity(pkg, sev);
+  return t.deferReasonDefault(pkg);
 }
 
 function higherSeverity(a: string, b: string): string {
@@ -303,9 +496,10 @@ function renderRecommendedActions(
   immediateFindings: ReportFinding[],
   plannedFindings: ReportFinding[],
   deferredFindings: ReportFinding[],
+  t: LangStrings,
 ): string[] {
   const lines: string[] = [];
-  lines.push("## 推奨対応順序");
+  lines.push(`## ${t.recommendedActions}`);
   lines.push("");
 
   // --- サマリー表（マネージャー向け一覧）---
@@ -313,36 +507,40 @@ function renderRecommendedActions(
   const planPkgMap = buildPackageMap(plannedFindings);
   const deferPkgMap = buildPackageMap(deferredFindings);
 
+  const pkgWord = (n: number) => t === JA ? `${n}パッケージ` : `${n} package${n !== 1 ? "s" : ""}`;
+
   const immTarget = immediateFindings.length === 0
     ? "—"
     : immPkgMap.size === 1
     ? `\`${escMd([...immPkgMap.keys()][0])}\``
-    : `${immPkgMap.size}パッケージ`;
+    : pkgWord(immPkgMap.size);
 
   let immAction = "—";
   if (immediateFindings.length > 0) {
     const ver = [...immPkgMap.values()][0]?.maxVer;
-    immAction = immPkgMap.size === 1 && ver ? `${escMd(ver)}へ更新` : "各パッケージを更新";
+    immAction = immPkgMap.size === 1 && ver
+      ? (t === JA ? `${escMd(ver)}へ更新` : `Update to ${escMd(ver)}`)
+      : t.perPackageUpdate;
   }
 
-  lines.push("| 対応期限 | 対象 | 件数 | 推奨アクション |");
+  lines.push(`| ${t.actionDeadlineCol} | ${t.actionTargetCol} | ${t.actionCountCol} | ${t.actionRecommendedCol} |`);
   lines.push("| --- | --- | ---: | --- |");
-  lines.push(`| 今週中 | ${immTarget} | ${immediateFindings.length} | ${immAction} |`);
+  lines.push(`| ${t.thisWeek} | ${immTarget} | ${immediateFindings.length} | ${immAction} |`);
   lines.push(
-    `| 今月中 | ${
-      plannedFindings.length > 0 ? `${planPkgMap.size}パッケージ` : "—"
-    } | ${plannedFindings.length} | ${plannedFindings.length > 0 ? "計画アップデート" : "—"} |`,
+    `| ${t.thisMonth} | ${
+      plannedFindings.length > 0 ? pkgWord(planPkgMap.size) : "—"
+    } | ${plannedFindings.length} | ${plannedFindings.length > 0 ? t.packageUpdate : "—"} |`,
   );
   lines.push(
-    `| 次回定期 | ${
-      deferredFindings.length > 0 ? `${deferPkgMap.size}パッケージ` : "—"
-    } | ${deferredFindings.length} | ${deferredFindings.length > 0 ? "定期更新で対応" : "—"} |`,
+    `| ${t.nextScheduled} | ${
+      deferredFindings.length > 0 ? pkgWord(deferPkgMap.size) : "—"
+    } | ${deferredFindings.length} | ${deferredFindings.length > 0 ? t.scheduledUpdate : "—"} |`,
   );
   lines.push("");
 
   // --- 期限別リスト ---
   if (immediateFindings.length > 0) {
-    lines.push(`### (1) 今週中（${immediateFindings.length}件）`);
+    lines.push(t.thisWeekSection(immediateFindings.length));
     lines.push("");
     for (const f of immediateFindings) {
       const pkg = f.package?.name ? `\`${escMd(f.package.name)}\`` : escMd(f.context.title ?? "—");
@@ -351,110 +549,108 @@ function renderRecommendedActions(
     }
     lines.push("");
   } else {
-    lines.push("### (1) 今週中");
+    lines.push(`### (1) ${t.thisWeek}`);
     lines.push("");
-    lines.push("即時対応が必要な項目はありません。");
+    lines.push(t.noImmediate);
     lines.push("");
   }
 
   if (plannedFindings.length > 0) {
-    lines.push(`### (2) 今月中（${plannedFindings.length}件 / ${planPkgMap.size}パッケージ）`);
+    lines.push(t.thisMonthSection(plannedFindings.length, planPkgMap.size));
     lines.push("");
     for (const [pkg, { findings }] of planPkgMap.entries()) {
-      const count = findings.length > 1 ? ` (${findings.length}件)` : "";
+      const count = findings.length > 1
+        ? (t === JA ? ` (${findings.length}件)` : ` (${findings.length})`)
+        : "";
       lines.push(`- \`${escMd(pkg)}\`${count}`);
     }
     lines.push("");
   } else {
-    lines.push("### (2) 今月中");
+    lines.push(`### (2) ${t.thisMonth}`);
     lines.push("");
-    lines.push("計画対応が必要な項目はありません。");
+    lines.push(t.noPlanned);
     lines.push("");
   }
 
   if (deferredFindings.length > 0) {
-    lines.push(`### (3) 次回定期アップデート時（${deferredFindings.length}件）`);
+    lines.push(t.nextScheduledSection(deferredFindings.length));
     lines.push("");
-    lines.push(
-      `${deferredFindings.length} 件は後回し可能と判断しました。詳細は「後回し可能項目」セクションを参照してください。`,
-    );
+    lines.push(t.deferNow(deferredFindings.length));
     lines.push("");
   }
 
   return lines;
 }
 
-function renderPackageSummaryTable(findings: ReportFinding[]): string[] {
+function renderPackageSummaryTable(findings: ReportFinding[], t: LangStrings): string[] {
   const pkgMap = buildPackageMap(findings);
   const hasGrouped = pkgMap.size > 1 || [...pkgMap.values()].some((v) => v.findings.length > 1);
   if (!hasGrouped) return [];
 
   const lines: string[] = [];
-  lines.push("### パッケージ別サマリー");
+  lines.push(`### ${t.pkgSummary}`);
   lines.push("");
-  lines.push("| パッケージ | CVE数 | 最大重大度 | 推奨バージョン |");
+  lines.push(`| ${t.colPackage} | ${t.colCveCount} | ${t.colMaxSev} | ${t.colRecommendedVersion} |`);
   lines.push("| --- | --- | --- | --- |");
   for (const [pkg, { findings, maxSev, maxVer }] of pkgMap.entries()) {
-    lines.push(
-      `| ${escMd(pkg)} | ${findings.length} | ${maxSev} | ${escMd(maxVer || "—")} |`,
-    );
+    lines.push(`| ${escMd(pkg)} | ${findings.length} | ${maxSev} | ${escMd(maxVer || "—")} |`);
   }
   lines.push("");
   return lines;
 }
 
-function renderDeferredCompact(findings: ReportFinding[]): string[] {
+function renderDeferredCompact(findings: ReportFinding[], t: LangStrings): string[] {
   const lines: string[] = [];
-  lines.push(`## 後回し可能項目（${findings.length}件）`);
+  lines.push(`## ${t.deferredItems(findings.length)}`);
   lines.push("");
   lines.push(
-    "現時点では即時対応条件に該当しないため次回定期アップデート時に対応してください。詳細は付録を参照してください。",
+    t === JA
+      ? "現時点では即時対応条件に該当しないため次回定期アップデート時に対応してください。詳細は付録を参照してください。"
+      : "These items do not meet immediate action criteria. Address at the next scheduled maintenance. See the Appendix for details.",
   );
   lines.push("");
 
   const pkgMap = buildPackageMap(findings);
-  lines.push("| パッケージ | 件数 | 最大重大度 | 推奨バージョン |");
+  lines.push(`| ${t.colPackage} | ${t.colCveCount} | ${t.colMaxSev} | ${t.colRecommendedVersion} |`);
   lines.push("| --- | --- | --- | --- |");
   for (const [pkg, { findings: pf, maxSev, maxVer }] of pkgMap.entries()) {
-    lines.push(
-      `| ${escMd(pkg)} | ${pf.length} | ${maxSev} | ${escMd(maxVer || "—")} |`,
-    );
+    lines.push(`| ${escMd(pkg)} | ${pf.length} | ${maxSev} | ${escMd(maxVer || "—")} |`);
   }
   lines.push("");
   return lines;
 }
 
-// finding を planLookup の AI テキストで補完してレンダー（セクション整合性チェック付き）
 function renderFindingWithPlan(
   f: ReportFinding,
   planLookup: Map<string, PlanAction | PlanDeferral>,
   section: "immediate" | "planned" | "deferred",
+  t: LangStrings,
 ): string[] {
-  // deferred は AI プランに依存せず決定論的に生成
   if (section === "deferred") {
     const rawTitle = f.context.title ?? f.findingId ?? "—";
     const title = rawTitle.length > 60 ? rawTitle.slice(0, 60) + "…" : rawTitle;
     return renderDeferralSection(
-      { findingId: f.findingId, title, deferReason: buildDeferReason(f) },
+      { findingId: f.findingId, title, deferReason: buildDeferReason(f, t) },
       f,
+      t,
     );
   }
 
   const planItem = f.findingId ? planLookup.get(f.findingId) : undefined;
-  if (!planItem) return renderFindingFallback(f);
+  if (!planItem) return renderFindingFallback(f, t);
 
   const rawText = "reason" in planItem ? planItem.reason : planItem.deferReason;
   const notes = "notes" in planItem ? (planItem as PlanAction).notes : undefined;
-  const text = sanitizeReason(rawText, section, f.findingId);
+  const text = sanitizeReason(rawText, section, t, f.findingId);
   return renderActionSection({
     findingId: planItem.findingId,
     title: planItem.title,
     reason: text,
     notes,
-  }, f);
+  }, f, t);
 }
 
-function renderActionSection(action: PlanAction, f: ReportFinding | undefined): string[] {
+function renderActionSection(action: PlanAction, f: ReportFinding | undefined, t: LangStrings): string[] {
   const lines: string[] = [];
   const heading = f?.findingId ? `${f.findingId} — ${escMd(action.title)}` : escMd(action.title);
   lines.push(`### ${heading}`);
@@ -464,23 +660,23 @@ function renderActionSection(action: PlanAction, f: ReportFinding | undefined): 
     lines.push("");
     lines.push(`> ${escMd(action.notes)}`);
   }
-  if (f) lines.push(...renderFindingTable(f));
+  if (f) lines.push(...renderFindingTable(f, t));
   lines.push("");
   return lines;
 }
 
-function renderDeferralSection(item: PlanDeferral, f: ReportFinding | undefined): string[] {
+function renderDeferralSection(item: PlanDeferral, f: ReportFinding | undefined, t: LangStrings): string[] {
   const lines: string[] = [];
   const heading = f?.findingId ? `${f.findingId} — ${escMd(item.title)}` : escMd(item.title);
   lines.push(`### ${heading}`);
   lines.push("");
-  lines.push(`後回し理由: ${item.deferReason}`);
-  if (f) lines.push(...renderFindingTable(f));
+  lines.push(`${t.deferNote}: ${item.deferReason}`);
+  if (f) lines.push(...renderFindingTable(f, t));
   lines.push("");
   return lines;
 }
 
-function renderFindingFallback(f: ReportFinding): string[] {
+function renderFindingFallback(f: ReportFinding, t: LangStrings): string[] {
   const lines: string[] = [];
   const heading = f.findingId
     ? `${f.findingId} — ${escMd(f.context.title)}`
@@ -488,21 +684,22 @@ function renderFindingFallback(f: ReportFinding): string[] {
   lines.push(`### ${heading}`);
   lines.push("");
   const urgency = f.recommendedAction.urgency ?? "deferred";
-  lines.push(FALLBACK_REASON[urgency]);
-  lines.push(...renderFindingTable(f));
+  const fallback = { immediate: t.fallbackImmediate, planned: t.fallbackPlanned, deferred: t.fallbackDeferred };
+  lines.push(fallback[urgency]);
+  lines.push(...renderFindingTable(f, t));
   lines.push("");
   return lines;
 }
 
-function renderFindingTable(f: ReportFinding): string[] {
+function renderFindingTable(f: ReportFinding, t: LangStrings): string[] {
   const rows: [string, string][] = [];
   if (f.package) {
-    rows.push(["パッケージ", `${f.package.name}`]);
-    rows.push(["現在バージョン", f.package.version]);
-    if (f.package.purl) rows.push(["PURL", f.package.purl]);
+    rows.push([t.colPackage, `${f.package.name}`]);
+    rows.push([t.colCurrentVersion, f.package.version]);
+    if (f.package.purl) rows.push([t.purl, f.package.purl]);
   }
   if (f.recommendedAction.recommendedVersion) {
-    rows.push(["推奨修正版", `**${f.recommendedAction.recommendedVersion}**`]);
+    rows.push([t.recommendedFix, `**${f.recommendedAction.recommendedVersion}**`]);
   }
   if (f.recommendedAction.fixedVersions?.length) {
     const available = filterAvailableVersions(
@@ -510,7 +707,7 @@ function renderFindingTable(f: ReportFinding): string[] {
       f.package?.version,
     );
     if (available.length > 0) {
-      rows.push(["利用可能", available.join(", ")]);
+      rows.push([t.available, available.join(", ")]);
     }
   }
   if (f.riskSignals.epss != null) {
@@ -518,31 +715,30 @@ function renderFindingTable(f: ReportFinding): string[] {
       "EPSS",
       `${(f.riskSignals.epss * 100).toFixed(1)}% (${
         f.riskSignals.epssPercentile != null
-          ? `${(f.riskSignals.epssPercentile * 100).toFixed(1)}パーセンタイル`
+          ? `${(f.riskSignals.epssPercentile * 100).toFixed(1)} ${t.percentile}`
           : ""
       })`,
     ]);
   }
   if (f.riskSignals.kev) {
-    rows.push([
-      "KEV",
-      `悪用確認済み${f.context.kevDateAdded ? ` (${f.context.kevDateAdded})` : ""}`,
-    ]);
+    rows.push(["KEV", t.kevConfirmed(f.context.kevDateAdded)]);
   }
   if (f.context.poc) {
     const { confidence, sources } = f.context.poc;
     const badge = confidence === "high"
-      ? "⚠ 高信頼度"
+      ? t.pocBadgeHigh
       : confidence === "medium"
-      ? "中信頼度"
-      : "低信頼度";
-    rows.push(["PoC", `公開済み [${badge}] (${sources.length} 件)`]);
+      ? t.pocBadgeMedium
+      : t.pocBadgeLow;
+    rows.push(["PoC", t.pocLabel(badge, sources.length)]);
     for (const s of sources) {
       rows.push(["", s.url]);
     }
   }
   if (f.context.cweIds?.length) rows.push(["CWE", f.context.cweIds.join(", ")]);
-  if (f.context.url) rows.push(["参考", f.context.url]);
+  if (f.context.url) {
+    rows.push([t === JA ? "参考" : "Reference", f.context.url]);
+  }
 
   if (rows.length === 0) return [];
 
@@ -594,53 +790,86 @@ function warnUrgencyMismatch(
   check("deferred", plan.deferredItems.map((d) => d.findingId));
 }
 
-function buildSummaryOpening(summary: ReportSummary, immediateCount: number): string {
+function buildSummaryOpening(summary: ReportSummary, immediateCount: number, lang: ReportLang): string {
   const { critical, high, medium, low, kevCount, epssHighCount } = summary;
 
+  if (lang === "ja") {
+    if (critical > 0 && kevCount > 0) {
+      return `今回のスキャンでは Critical の脆弱性が ${critical} 件検出され、うち ${kevCount} 件が KEV（実悪用確認済み）に登録されています。即時対応が必要な項目が ${immediateCount} 件あります。`;
+    }
+    if (critical > 0) {
+      return `今回のスキャンでは Critical の脆弱性が ${critical} 件検出されました。即時対応対象は ${immediateCount} 件です。`;
+    }
+    if (high > 0 && kevCount > 0) {
+      return `今回のスキャンでは High の脆弱性が ${high} 件、うち ${kevCount} 件が KEV（実悪用確認済み）に登録されています。即時対応が必要な項目が ${immediateCount} 件あります。`;
+    }
+    if (high > 0) {
+      return `今回のスキャンでは High の脆弱性が ${high} 件検出されました。Critical / KEV には該当しないため即時対応対象は ${immediateCount} 件ですが、計画的な対応を推奨します。${
+        epssHighCount > 0 ? ` なお EPSS ≥ 70% の脆弱性が ${epssHighCount} 件含まれます。` : ""
+      }`;
+    }
+    if (medium > 0 || low > 0) {
+      return `今回のスキャンでは Critical / High の脆弱性は検出されませんでした。Medium が ${medium} 件${
+        low > 0 ? `、Low が ${low} 件` : ""
+      }確認されており、通常の更新サイクルでの対応を推奨します。`;
+    }
+    return "今回のスキャンでは脆弱性は検出されませんでした。";
+  }
+
+  // English
   if (critical > 0 && kevCount > 0) {
-    return `今回のスキャンでは Critical の脆弱性が ${critical} 件検出され、うち ${kevCount} 件が KEV（実悪用確認済み）に登録されています。即時対応が必要な項目が ${immediateCount} 件あります。`;
+    return `This scan detected ${critical} Critical vulnerability${critical !== 1 ? "ies" : ""}, of which ${kevCount} ${kevCount !== 1 ? "are" : "is"} listed in KEV (known active exploitation). ${immediateCount} item${immediateCount !== 1 ? "s" : ""} require immediate action.`;
   }
   if (critical > 0) {
-    return `今回のスキャンでは Critical の脆弱性が ${critical} 件検出されました。即時対応対象は ${immediateCount} 件です。`;
+    return `This scan detected ${critical} Critical vulnerability${critical !== 1 ? "ies" : ""}. ${immediateCount} item${immediateCount !== 1 ? "s" : ""} require immediate action.`;
   }
   if (high > 0 && kevCount > 0) {
-    return `今回のスキャンでは High の脆弱性が ${high} 件、うち ${kevCount} 件が KEV（実悪用確認済み）に登録されています。即時対応が必要な項目が ${immediateCount} 件あります。`;
+    return `This scan detected ${high} High-severity vulnerability${high !== 1 ? "ies" : ""}, of which ${kevCount} ${kevCount !== 1 ? "are" : "is"} listed in KEV. ${immediateCount} item${immediateCount !== 1 ? "s" : ""} require immediate action.`;
   }
   if (high > 0) {
-    return `今回のスキャンでは High の脆弱性が ${high} 件検出されました。Critical / KEV には該当しないため即時対応対象は ${immediateCount} 件ですが、計画的な対応を推奨します。${
-      epssHighCount > 0 ? ` なお EPSS ≥ 70% の脆弱性が ${epssHighCount} 件含まれます。` : ""
+    return `This scan detected ${high} High-severity vulnerability${high !== 1 ? "ies" : ""}. None qualify as Critical/KEV so ${immediateCount} item${immediateCount !== 1 ? "s" : ""} require immediate action, but planned remediation is recommended.${
+      epssHighCount > 0 ? ` Note: ${epssHighCount} finding${epssHighCount !== 1 ? "s" : ""} have EPSS ≥ 70%.` : ""
     }`;
   }
   if (medium > 0 || low > 0) {
-    return `今回のスキャンでは Critical / High の脆弱性は検出されませんでした。Medium が ${medium} 件${
-      low > 0 ? `、Low が ${low} 件` : ""
-    }確認されており、通常の更新サイクルでの対応を推奨します。`;
+    return `No Critical or High vulnerabilities were detected. ${medium} Medium${
+      low > 0 ? ` and ${low} Low` : ""
+    } finding${medium + low !== 1 ? "s" : ""} were found — address during your regular update cycle.`;
   }
-  return "今回のスキャンでは脆弱性は検出されませんでした。";
+  return "No vulnerabilities were detected in this scan.";
 }
 
 type SummaryConflict = string;
 
-// immediate=0 のとき即時対応を示唆する文を句点単位で除外する
 function sanitizeImmediateExpressions(
   text: string,
   immediateCount: number,
+  lang: ReportLang,
 ): { cleaned: string; removedCount: number } {
   if (immediateCount > 0) return { cleaned: text, removedCount: 0 };
 
-  const patterns = [
-    "即時対応",
-    "緊急対応",
-    "直ちに対応",
-    "早急に対応",
-    "優先的に対応",
-    "至急対応",
-    "直ちに修正",
-    "早急な対応",
-    "緊急な対応",
-  ];
+  const patterns = lang === "ja"
+    ? [
+      "即時対応",
+      "緊急対応",
+      "直ちに対応",
+      "早急に対応",
+      "優先的に対応",
+      "至急対応",
+      "直ちに修正",
+      "早急な対応",
+      "緊急な対応",
+    ]
+    : [
+      "immediate action",
+      "must be fixed immediately",
+      "urgent remediation",
+      "fix immediately",
+      "requires immediate",
+      "urgent action",
+    ];
 
-  const parts = text.split("。");
+  const parts = lang === "ja" ? text.split("。") : text.split(/(?<=[.!?])\s+/);
   const kept: string[] = [];
   let removedCount = 0;
 
@@ -656,78 +885,63 @@ function sanitizeImmediateExpressions(
     }
   }
 
-  return { cleaned: kept.join("。"), removedCount };
+  return { cleaned: kept.join(lang === "ja" ? "。" : " "), removedCount };
 }
 
 function detectSummaryConflicts(
   text: string,
   summary: ReportSummary,
   plannedCount: number,
+  lang: ReportLang,
 ): SummaryConflict[] {
   const conflicts: SummaryConflict[] = [];
   const highOrAbove = summary.high + summary.critical;
 
   if (highOrAbove > 0) {
-    const negations = [
-      "高リスクの脆弱性は見られません",
-      "高リスクなし",
-      "高リスクは確認されません",
-      "高リスクは見られません",
-      "高い脆弱性はありません",
-      "高リスクの脆弱性は見つかりません",
-      "高リスクの脆弱性は検出されません",
-    ];
-    if (negations.some((p) => text.includes(p))) {
-      conflicts.push(
-        `high=${summary.high}/critical=${summary.critical} なのに高リスク否定表現あり`,
-      );
+    const negations = lang === "ja"
+      ? ["高リスクの脆弱性は見られません", "高リスクなし", "高リスクは確認されません", "高い脆弱性はありません"]
+      : ["no high-risk", "no high severity", "no critical", "zero high"];
+    if (negations.some((p) => text.toLowerCase().includes(p.toLowerCase()))) {
+      conflicts.push(`high=${summary.high}/critical=${summary.critical} but negation found`);
     }
   }
 
   if (plannedCount > 0) {
-    const allDeferredPatterns = [
-      "すべて後回し",
-      "全て後回し",
-      "すべて後回しで",
-      "すべてdeferred",
-    ];
-    if (allDeferredPatterns.some((p) => text.includes(p))) {
-      conflicts.push(`planned=${plannedCount} なのに「すべて後回し」表現あり`);
+    const allDeferred = lang === "ja"
+      ? ["すべて後回し", "全て後回し", "すべてdeferred"]
+      : ["all deferred", "everything deferred"];
+    if (allDeferred.some((p) => text.toLowerCase().includes(p.toLowerCase()))) {
+      conflicts.push(`planned=${plannedCount} but "all deferred" expression found`);
     }
   }
 
   if (summary.critical === 0) {
-    const criticalAffirm = [
-      "Critical が存在",
-      "Critical が検出",
-      "Criticalが存在",
-      "クリティカルな脆弱性が存在",
-    ];
-    if (criticalAffirm.some((p) => text.includes(p))) {
-      conflicts.push("critical=0 なのに Critical 存在の表現あり");
+    const criticalAffirm = lang === "ja"
+      ? ["Critical が存在", "Critical が検出", "クリティカルな脆弱性が存在"]
+      : ["critical vulnerability exists", "critical issue detected"];
+    if (criticalAffirm.some((p) => text.toLowerCase().includes(p.toLowerCase()))) {
+      conflicts.push("critical=0 but affirmation of critical found");
     }
   }
 
   if (summary.kevCount === 0) {
-    const kevAffirm = ["悪用確認済み", "KEVに登録", "実際に悪用されており", "既に悪用"];
-    if (kevAffirm.some((p) => text.includes(p))) {
-      conflicts.push("kev=0 なのに悪用確認済みの表現あり");
+    const kevAffirm = lang === "ja"
+      ? ["悪用確認済み", "KEVに登録", "実際に悪用されており"]
+      : ["active exploitation", "listed in kev", "actively exploited"];
+    if (kevAffirm.some((p) => text.toLowerCase().includes(p.toLowerCase()))) {
+      conflicts.push("kev=0 but KEV affirmation found");
     }
   }
 
   return conflicts;
 }
 
-function riskLabel(risk: string): string {
+function riskLabel(risk: string, _lang: ReportLang): string {
   switch (risk) {
-    case "critical":
-      return "Critical";
-    case "high":
-      return "High";
-    case "medium":
-      return "Medium";
-    default:
-      return "Low";
+    case "critical": return "Critical";
+    case "high": return "High";
+    case "medium": return "Medium";
+    default: return "Low";
   }
 }
 
