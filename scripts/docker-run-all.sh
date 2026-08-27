@@ -26,10 +26,14 @@ Arguments:
   --fail-on SEVERITY    閾値 (default: high)
   --report-name NAME    レポート名プレフィックス
 
+レポートオプション:
+  --no-llm              AI を使わず決定論的レポートを生成（Ollama/OpenAI 不要）
+
   -h, --help            このヘルプを表示
 
 環境変数:
   REPORT_LLM_MODEL      Ollama モデル名 (default: qwen2.5:7b)
+  REPORT_NO_LLM         true のとき --no-llm と同等
   その他は docker-scan.sh / docker-enrich.sh / docker-report.sh -h を参照
 EOF
 }
@@ -38,6 +42,7 @@ FROM_SCAN=""
 FROM_ENRICH=""
 TARGET_DIR=""
 EXTRA_SCAN_ARGS=()
+NO_LLM=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -46,6 +51,7 @@ while [[ $# -gt 0 ]]; do
     --from-scan=*)   FROM_SCAN="${1#*=}"; shift ;;
     --from-enrich)   FROM_ENRICH="$2"; shift 2 ;;
     --from-enrich=*) FROM_ENRICH="${1#*=}"; shift ;;
+    --no-llm)        NO_LLM=true; shift ;;
     *)
       if [[ -z "$TARGET_DIR" && ( -d "$1" || "$1" == "." ) ]]; then
         TARGET_DIR="$1"
@@ -133,7 +139,9 @@ fi
 echo "" >&2
 echo "[run-all] ステップ 3/3: レポート生成" >&2
 _report_exit=0
-"$SCRIPT_DIR/docker-report.sh" "$ENRICH_OUTPUT" || _report_exit=$?
+_report_extra_args=()
+[[ "$NO_LLM" == "true" ]] && _report_extra_args+=(--no-llm)
+"$SCRIPT_DIR/docker-report.sh" "$ENRICH_OUTPUT" ${_report_extra_args[@]+"${_report_extra_args[@]}"} || _report_exit=$?
 
 if [[ $_report_exit -ne 0 ]]; then
   echo "" >&2

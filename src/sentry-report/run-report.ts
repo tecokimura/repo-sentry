@@ -17,6 +17,7 @@ export interface ReportRequest {
   debugInputOutput?: string;
   planner: PlannerConfig;
   lang?: ReportLang;
+  noLlm?: boolean; // true のとき AI を呼ばず決定論的 plan で生成
 }
 
 export interface ReportResult {
@@ -39,14 +40,18 @@ export async function runReport(request: ReportRequest): Promise<ReportResult> {
   const plannerConfig: PlannerConfig = { ...request.planner, lang };
 
   let plan: ReportPlan;
-  if (request.planInput) {
+  if (request.noLlm) {
+    plan = buildNoLlmPlan(reportInput);
+    console.error("[sentry-report] --no-llm: AI 呼び出しをスキップします（決定論的レポート）");
+  } else if (request.planInput) {
     plan = normalizeReportPlan(await readJsonFile(request.planInput) as ReportPlan);
     console.error(`[sentry-report] plan     ← ${request.planInput} (再利用)`);
   } else {
     plan = await generateReportPlan(reportInput, plannerConfig);
   }
 
-  if (request.planOutput) {
+  // --no-llm 時は空の plan を保存しても意味がないためスキップ
+  if (request.planOutput && !request.noLlm) {
     await writeTextFile(request.planOutput, JSON.stringify(plan, null, 2));
     console.error(`[sentry-report] plan     → ${request.planOutput}`);
   }
@@ -59,4 +64,18 @@ export async function runReport(request: ReportRequest): Promise<ReportResult> {
   }
 
   return { reportInput, plan, markdown };
+}
+
+/** AI を使わず findings データから overallRisk を決定論的に計算した最小 plan を生成 */
+function buildNoLlmPlan(input: ReportInput): ReportPlan {
+  const hasKev = input.findings.some((f) => f.riskSignals.kev);
+  const { critical, high, medium } = input.summary;
+
+  let overallRisk: ReportPlan["overallRisk"];
+  if (hasKev || critical > 0) overallRisk = "critical";
+  else if (high > 0) overallRisk = "high";
+  else if (medium > 0) overallRisk = "medium";
+  else overallRisk = "low";
+
+  return normalizeReportPlan({ overallRisk } as ReportPlan);
 }

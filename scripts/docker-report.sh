@@ -16,6 +16,7 @@ Options:
   --output PATH         report.md の出力パス (default: 入力と同じディレクトリに report_... を生成)
   --plan-input PATH     既存の report-plan.json を再利用（AI 呼び出しをスキップ）
   --plan-output PATH    report-plan.json の出力パス (default: 同ディレクトリに自動生成)
+  --no-llm              AI を使わず決定論的レポートを生成（Ollama/OpenAI 不要）
   --debug               report-input.json も保存する
   -h, --help            このヘルプを表示
 
@@ -34,6 +35,7 @@ Options:
   REPORTS_DIR           reports ルートディレクトリ (default: 入力ファイルの親の親)
   DOCKER_USER           Docker 実行ユーザー (default: 現在の UID:GID)
   REPORT_LANG           レポート言語: en (default) または ja
+  REPORT_NO_LLM         true のとき --no-llm と同等
 EOF
 }
 
@@ -68,6 +70,7 @@ OUTPUT_FILE=""
 PLAN_INPUT_FILE=""
 PLAN_FILE=""
 DEBUG=false
+NO_LLM=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -79,6 +82,7 @@ while [[ $# -gt 0 ]]; do
     --plan-output)  PLAN_FILE="$2"; shift 2 ;;
     --plan-output=*) PLAN_FILE="${1#*=}"; shift ;;
     --debug)      DEBUG=true; shift ;;
+    --no-llm)     NO_LLM=true; shift ;;
     -*)
       echo "不明なオプション: $1" >&2; usage >&2; exit 2 ;;
     *)
@@ -171,9 +175,12 @@ if [[ -f "${ENV_FILE:-.env}" ]]; then
   _env_file_args=(--env-file "${ENV_FILE:-.env}")
 fi
 
-# Ollama コンテナの自動起動・自動作成（OpenAI 使用時はスキップ）
+# --no-llm または REPORT_NO_LLM=true のとき Ollama セクションをスキップ
+[[ "${REPORT_NO_LLM:-}" == "true" ]] && NO_LLM=true
+
+# Ollama コンテナの自動起動・自動作成（OpenAI 使用時・--no-llm 時はスキップ）
 _provider="${REPORT_LLM_PROVIDER:-${CLEARWING_PROVIDER:-}}"
-if [[ "$_provider" != "openai" && -z "${OPENAI_API_KEY:-}" ]]; then
+if [[ "$NO_LLM" != "true" && "$_provider" != "openai" && -z "${OPENAI_API_KEY:-}" ]]; then
   _ollama_container="${OLLAMA_CONTAINER:-ollama-report}"
   _ollama_model="${REPORT_LLM_MODEL:-${OLLAMA_MODEL:-qwen2.5:7b}}"
   _ollama_port="${OLLAMA_PORT:-11434}"
@@ -225,6 +232,9 @@ if [[ "$_provider" != "openai" && -z "${OPENAI_API_KEY:-}" ]]; then
   fi
 fi
 
+_no_llm_args=()
+[[ "$NO_LLM" == "true" ]] && _no_llm_args=(--no-llm)
+
 _exit=0
 docker run --rm \
   --user "$DOCKER_USER" \
@@ -242,6 +252,7 @@ docker run --rm \
   --input "$_container_input" \
   --output "$_container_output" \
   --plan-output "$_container_plan" \
+  ${_no_llm_args[@]+"${_no_llm_args[@]}"} \
   ${_plan_input_args[@]+"${_plan_input_args[@]}"} \
   ${_debug_args[@]+"${_debug_args[@]}"} || _exit=$?
 

@@ -51,6 +51,7 @@ function parseArgs(args: string[]): ReportRequest {
     else if (arg.startsWith("--ollama-model=")) req.planner.ollamaModel = val("--ollama-model=");
     else if (arg === "--openai-model") req.planner.openaiModel = next();
     else if (arg.startsWith("--openai-model=")) req.planner.openaiModel = val("--openai-model=");
+    else if (arg === "--no-llm") req.noLlm = true;
   }
 
   req.planner.openaiApiKey = Deno.env.get("OPENAI_API_KEY");
@@ -72,6 +73,8 @@ function parseArgs(args: string[]): ReportRequest {
     const l = Deno.env.get("REPORT_LANG");
     if (l === "ja") req.lang = "ja";
   }
+  // REPORT_NO_LLM: "true" のとき AI 呼び出しをスキップ
+  if (!req.noLlm && Deno.env.get("REPORT_NO_LLM") === "true") req.noLlm = true;
 
   if (!req.input) throw new Error("--input is required");
   return req as ReportRequest;
@@ -89,6 +92,7 @@ Options:
   --plan-input PATH            既存の report-plan.json を再利用（AI 呼び出しをスキップ）
   --plan-output PATH           Output report-plan.json path
   --debug-input PATH           Save report-input.json (debug)
+  --no-llm                     LLM を使わず決定論的レポートを生成（調査・TODO リスト用途）
   --provider openai|ollama     LLM provider (default: auto-detect)
   --ollama-host URL            Ollama host (default: http://host.docker.internal:11434)
   --ollama-model MODEL         Ollama model
@@ -101,6 +105,7 @@ Environment variables:
   REPORT_LLM_MODEL             Ollama model (OLLAMA_MODEL as fallback)
   OLLAMA_BASE_URL              Ollama host URL (OLLAMA_HOST as fallback)
   REPORT_LANG                  Report language: en (default) or ja
+  REPORT_NO_LLM                "true" のとき --no-llm と同等
 `;
 }
 

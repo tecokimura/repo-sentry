@@ -593,6 +593,8 @@ REPORT_LLM_MODEL=qwen2.5:7b \
 | `OPENAI_API_KEY`      | —                                   | OpenAI API キー                                         |
 | `REPORT_LLM_MODEL`    | `qwen2.5:7b` / `gpt-4o-mini`        | LLM モデル名（`OLLAMA_MODEL` でも可）                   |
 | `OLLAMA_BASE_URL`     | `http://host.docker.internal:11434` | Ollama ホスト（`OLLAMA_HOST` でも可）                   |
+| `REPORT_LANG`         | `en`                                | レポート言語: `en`（英語）または `ja`（日本語）         |
+| `REPORT_NO_LLM`       | —                                   | `true` のとき `--no-llm` と同等（AI 呼び出しをスキップ）|
 
 ### AI の責務分離
 
@@ -609,6 +611,36 @@ Renderer（`ReportInput` から直接）が担当する内容:
 
 → AI が修正コマンドやバージョンを捏造するリスクを排除しています。
 
+### --no-llm モード（LLM なし・決定論的レポート）
+
+LLM（Ollama / OpenAI）を使わずに、`enriched_*.json` のデータだけから調査・TODO リストを生成します。
+
+```bash
+./scripts/docker-report.sh --no-llm enriched.json
+```
+
+または `docker-run-all.sh` でスキャンから一括実行する場合:
+
+```bash
+./scripts/docker-run-all.sh /path/to/target-repo --no-llm
+```
+
+**生成されるレポートの内容（LLM なし）:**
+
+| セクション | 内容 |
+| --- | --- |
+| 総合リスク評価 | KEV/Critical/High/Medium から自動計算 |
+| スキャン概要 | 検出数・KEV・EPSS 統計 |
+| 推奨対応順序 | immediate/planned/deferred の分類（決定論的） |
+| 即時・計画対応項目 | パッケージ名・CVE・修正バージョン・fix コマンド |
+| 後回し可能項目 | 後回し理由（KEV/EPSS/transitive 依存から自動生成） |
+| 修正ガイド | パッケージ別の推奨バージョン一覧 |
+| 付録 | 全 Finding 一覧 |
+
+**LLM ありとの違い:** `executiveSummary`（総評ナレーション）・各 finding の詳細な対応理由・`notableRisks`（横断的リスク分析）は生成されません。urgency 分類・バージョン・EPSS・KEV などのファクト情報は LLM ありと同じ内容が出力されます。
+
+> このモードで生成した `report.md` を別の AI（Claude、ChatGPT など）に貼り付けて追加分析を依頼することもできます。
+
 ### docker-report.sh オプション
 
 | オプション           | 説明                                                             |
@@ -617,6 +649,7 @@ Renderer（`ReportInput` から直接）が担当する内容:
 | `--output PATH`      | `report.md` の出力パス（省略時は入力と同ディレクトリに自動生成） |
 | `--plan-output PATH` | `report-plan.json` の出力パス                                    |
 | `--plan-input PATH`  | 既存の `report-plan.json` を再利用（AI 呼び出しをスキップ）      |
+| `--no-llm`           | AI を使わず決定論的レポートを生成（Ollama/OpenAI 不要）          |
 | `--debug`            | `report-input.json` も保存（デバッグ用）                         |
 
 ---
@@ -632,11 +665,14 @@ Renderer（`ReportInput` から直接）が担当する内容:
 # stdout: reports/target-repo/report_target_XXXX26071016.md
 ```
 
-| オプション           | 既定値           | 説明                      |
-| -------------------- | ---------------- | ------------------------- |
-| `TARGET_DIR`         | 必須             | スキャン対象ディレクトリ  |
-| `--report-name NAME` | ディレクトリ名   | レポート名プレフィックス  |
-| `--tools LIST`       | `gitleaks,trivy` | scan で実行する collector |
+| オプション           | 既定値           | 説明                                       |
+| -------------------- | ---------------- | ------------------------------------------ |
+| `TARGET_DIR`         | 必須             | スキャン対象ディレクトリ                   |
+| `--report-name NAME` | ディレクトリ名   | レポート名プレフィックス                   |
+| `--tools LIST`       | `gitleaks,trivy` | scan で実行する collector                  |
+| `--no-llm`           | —                | AI を使わず決定論的レポートを生成          |
+| `--from-scan JSON`   | —                | 既存の scan_*.json から再開                |
+| `--from-enrich JSON` | —                | 既存の enriched_*.json からレポートのみ再実行 |
 
 SBOM が生成されていれば enrich に自動で渡されます（direct/transitive 判定に使用）。 scan
 の終了コードが `0`（finding なし）または `1`（finding あり）の場合は後続へ進み、 `2`
@@ -902,6 +938,8 @@ critical / high のみに絞れます。
 - Markdown レポート生成（AI 文章 + 機械データの分離）
 - エグゼクティブサマリー事実検証（AI テキスト矛盾検出・フォールバック）
 - canonicalReference 優先の参考 URL 表示
+- `--no-llm` モード（AI 不要・決定論的レポート生成）
+- `REPORT_LANG` による英語/日本語切り替え（デフォルト: 英語）
 
 **sentry-export（PDF 生成）**: 動作確認済み
 
